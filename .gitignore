@@ -1,0 +1,18 @@
+# Secrets / local env
+.env
+.env.*
+!.env.example
+
+# Build output / deps / cache
+build/
+node_modules/
+cache/
+
+# OS / editor cruft
+.DS_Store
+
+# Temporary verification scripts
+tmp_*.ts
+
+# Dev API smoke-test scratch (not part of the public package)
+test-api.ts

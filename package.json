@@ -1,0 +1,31 @@
+{
+  "name": "intervals-mcp-server",
+  "version": "0.1.0",
+  "description": "Intervals.icu MCP Server for running training management",
+  "license": "AGPL-3.0-or-later",
+  "type": "module",
+  "main": "build/index.js",
+  "scripts": {
+    "build": "tsc",
+    "dev": "tsx --env-file .env src/index.ts",
+    "clean": "rm -rf build",
+    "start": "node --env-file .env build/index.js",
+    "test": "INTERVALS_ATHLETE_ID=i12345678 INTERVALS_API_KEY=dummy-key-for-tests node --env-file-if-exists=.env node_modules/vitest/vitest.mjs run",
+    "start:http": "MCP_TRANSPORT=http node --env-file .env build/index.js"
+  },
+  "engines": {
+    "node": ">=20.12.0"
+  },
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.26.0",
+    "express": "^5.2.1",
+    "zod": "^4.3.6"
+  },
+  "devDependencies": {
+    "@types/express": "^5.0.6",
+    "@types/node": "^25.3.0",
+    "tsx": "^4.19.2",
+    "typescript": "^5.9.3",
+    "vitest": "^3.0.0"
+  }
+}
