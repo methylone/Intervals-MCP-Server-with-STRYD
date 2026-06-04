@@ -1,0 +1,30 @@
+# SPDX-License-Identifier: AGPL-3.0-or-later
+# Run the Intervals.icu MCP Server in Streamable HTTP mode.
+#
+#   cp .env.example .env   # fill in INTERVALS_API_KEY / INTERVALS_ATHLETE_ID / ATHLETE_TIMEZONE
+#   docker compose up -d --build
+#
+# Then point your MCP client at http://<host>:8080/mcp (see INSTALL.md).
+# This binds 0.0.0.0 and has no app-layer auth — keep it on a trusted
+# network (LAN / Tailscale), never expose it directly to the public internet.
+
+services:
+  intervals-mcp:
+    build: .
+    container_name: intervals-mcp
+    restart: unless-stopped
+    ports:
+      - "8080:8080"
+    # Secrets come from .env; the values below override any stale CACHE_DIR /
+    # transport settings that a host-oriented .env might carry.
+    env_file:
+      - .env
+    environment:
+      MCP_TRANSPORT: http
+      MCP_PORT: "8080"
+      CACHE_DIR: /data/cache/streams
+    volumes:
+      - intervals-cache:/data/cache/streams
+
+volumes:
+  intervals-cache:

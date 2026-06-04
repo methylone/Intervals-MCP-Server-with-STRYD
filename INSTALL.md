@@ -150,7 +150,38 @@ Claude Desktop does not connect to HTTP MCP servers directly; bridge it with
 
 To keep it running 24/7 on a server, run it under a process manager such as
 `systemd` (a `simple` service that runs `node build/index.js` with
-`Environment=MCP_TRANSPORT=http` and an `EnvironmentFile` pointing at your `.env`).
+`Environment=MCP_TRANSPORT=http` and an `EnvironmentFile` pointing at your `.env`),
+or use Docker (below).
+
+### Run with Docker (HTTP mode)
+
+A `Dockerfile` and `docker-compose.yml` are included. The container runs in HTTP
+mode, so the same SECURITY caveats apply — keep it on a trusted network and never
+expose it to the public internet.
+
+```bash
+cp .env.example .env        # fill in API key, athlete ID, timezone
+docker compose up -d --build
+curl http://127.0.0.1:8080/health   # -> {"status":"ok",...}
+```
+
+The image is a multi-stage Node 22 Alpine build: it runs as a non-root user, ships
+a `/health` HEALTHCHECK, and contains only production dependencies plus the compiled
+`build/`. Secrets are read from `.env` via compose `env_file`; the stream cache
+lives in the named volume `intervals-cache`. The compose `environment:` block forces
+`CACHE_DIR=/data/cache/streams`, so a host-oriented `CACHE_DIR` in your `.env` is
+safely overridden inside the container.
+
+Without compose:
+
+```bash
+docker build -t intervals-mcp .
+docker run -d --name intervals-mcp -p 8080:8080 \
+  --env-file .env -e MCP_TRANSPORT=http -e CACHE_DIR=/data/cache/streams \
+  -v intervals-cache:/data/cache/streams intervals-mcp
+```
+
+Bridge it to your client (e.g. `mcp-remote`) exactly as in HTTP mode above.
 
 ## Let an AI install it
 

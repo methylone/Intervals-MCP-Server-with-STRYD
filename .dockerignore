@@ -1,0 +1,17 @@
+# Keep the build context small and secret-free.
+node_modules
+build
+cache
+.git
+.gitignore
+.env
+.env.*
+!.env.example
+__tests__
+docs
+*.md
+training-knowledge-template
+.github
+Dockerfile
+docker-compose.yml
+.dockerignore

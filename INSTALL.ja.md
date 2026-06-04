@@ -147,7 +147,36 @@ HTTPS でないため `--allow-http` が必要です:
 
 サーバ上で 24/7 稼働させ続けるには、`systemd` のようなプロセスマネージャの下で実行します
 （`node build/index.js` を `Environment=MCP_TRANSPORT=http` と、`.env` を指す `EnvironmentFile`
-付きで実行する `simple` サービス）。
+付きで実行する `simple` サービス）。または下記の Docker を使います。
+
+### Docker で実行（HTTP モード）
+
+`Dockerfile` と `docker-compose.yml` を同梱しています。コンテナは HTTP モードで動作するため、
+SECURITY の注意はそのまま当てはまります — 信頼できるネットワーク内のみで動かし、公開インターネットに
+直接さらさないでください。
+
+```bash
+cp .env.example .env        # API キー・athlete ID・タイムゾーンを記入
+docker compose up -d --build
+curl http://127.0.0.1:8080/health   # -> {"status":"ok",...}
+```
+
+イメージはマルチステージの Node 22 Alpine ビルドで、非 root ユーザで動作し、`/health` の
+HEALTHCHECK を備え、本番依存とコンパイル済み `build/` のみを含みます。秘密情報は compose の
+`env_file` 経由で `.env` から読み込まれ、ストリームキャッシュは名前付きボリューム
+`intervals-cache` に保存されます。compose の `environment:` で `CACHE_DIR=/data/cache/streams`
+を強制するため、`.env` にホスト向けの `CACHE_DIR` が入っていてもコンテナ内では安全に上書きされます。
+
+compose を使わない場合:
+
+```bash
+docker build -t intervals-mcp .
+docker run -d --name intervals-mcp -p 8080:8080 \
+  --env-file .env -e MCP_TRANSPORT=http -e CACHE_DIR=/data/cache/streams \
+  -v intervals-cache:/data/cache/streams intervals-mcp
+```
+
+クライアントへの橋渡し（例: `mcp-remote`）は上記 HTTP モードと同じ手順です。
 
 ## AI に任せてインストールする
 
