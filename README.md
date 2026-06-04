@@ -26,7 +26,7 @@ your AI client. See [`training-knowledge-template/`](training-knowledge-template
 
 ## Quick start
 
-Requirements: Node.js ≥ 20.6, an Intervals.icu account and API key. The Stryd
+Requirements: Node.js ≥ 20.12, an Intervals.icu account and API key. The Stryd
 extension additionally needs a Stryd power meter and the relevant Intervals.icu
 custom fields. Full steps: [INSTALL.md](INSTALL.md).
 

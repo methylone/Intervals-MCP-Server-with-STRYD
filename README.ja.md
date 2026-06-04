@@ -25,7 +25,7 @@ AIクライアント（Claude Desktop, Codex など）に、あなたの [Interv
 
 ## クイックスタート
 
-前提：Node.js ≥ 20.6、Intervals.icu アカウントと API キー。Stryd 拡張を使う場合は
+前提：Node.js ≥ 20.12、Intervals.icu アカウントと API キー。Stryd 拡張を使う場合は
 Stryd パワーメーターと、対応する Intervals.icu のカスタムフィールドが追加で必要です。
 詳細は [INSTALL.ja.md](INSTALL.ja.md)。
 

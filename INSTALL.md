@@ -9,8 +9,8 @@ into an AI assistant and have it do the setup for you (see
 
 ## Prerequisites
 
-- **Node.js >= 20.6** (the server uses the built-in `--env-file` flag). Check with
-  `node --version`.
+- **Node.js >= 20.12** (the server uses the built-in `--env-file` flag; the test
+  script uses `--env-file-if-exists`, added in 20.12). Check with `node --version`.
 - **An Intervals.icu account** with an **API key**: on intervals.icu go to
   *Settings → Developer* and copy your API key.
 - **Your athlete ID**: visible in the Intervals.icu URL when viewing your own

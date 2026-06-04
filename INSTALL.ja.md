@@ -9,8 +9,8 @@ AI アシスタントに渡してセットアップを代行させることも�
 
 ## 前提条件
 
-- **Node.js >= 20.6**（サーバは組み込みの `--env-file` フラグを使用します）。`node --version`
-  で確認してください。
+- **Node.js >= 20.12**（サーバは組み込みの `--env-file` フラグを使用。テストスクリプトは
+  20.12 で追加された `--env-file-if-exists` を使用します）。`node --version` で確認してください。
 - **Intervals.icu アカウント**と **API key**：intervals.icu の *Settings → Developer* で
   API key をコピーします。
 - **あなたの athlete ID**：自分のカレンダー/プロフィールを表示しているときに Intervals.icu の
