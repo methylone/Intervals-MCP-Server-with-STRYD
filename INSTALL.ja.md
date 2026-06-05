@@ -18,9 +18,9 @@ AI アシスタントに渡してセットアップを代行させることも�
   これは「この API key の所有者」を意味します。
 - **（任意）Stryd エクステンション。** `get_current_pmc`、`get_weekly_summary`、
   `get_phase_summary` の各ツールは Stryd の負荷指標（LBSS / ILR）を使用します。これらには
-  Stryd パワーメーター**と**、対応する Intervals.icu のカスタムフィールド（例: `StrydLBSSmod`）が
-  アクティビティに存在することが必要です。**コアツールは Stryd なしでも動作します** — エクステンションは
-  パワーベースの PMC を上乗せするだけです。
+  Stryd パワーメーター**と** 3 つの Intervals.icu カスタムフィールドが必要です —
+  [Stryd カスタムフィールドの設定](#stryd-カスタムフィールドの設定任意)を参照してください。
+  **コアツールは Stryd なしでも動作します** — エクステンションはパワーベースの PMC を上乗せするだけです。
 - **（任意）天候メトリクス。** `search_similar_activities` が使用する `average_feels_like` の値は、
   Intervals.icu の Open-Meteo エンリッチメントに由来します。温度フィルタを設定すると、天候データの
   ないアクティビティは除外されます。
@@ -67,6 +67,39 @@ npm run build
 - **`CACHE_ENABLED`** — `true`（デフォルト）または `false`。`false` にするとストリームキャッシュを
   完全にバイパスします（常に新規取得）。チャットから `set_cache_enabled` ツールでランタイムに
   切り替えることもできます。ランタイムの状態は再起動時にこの値へ戻ります。
+
+### Stryd カスタムフィールドの設定（任意）
+
+Stryd エクステンションは 3 つの Intervals.icu **カスタムアクティビティフィールド**を読み取ります。
+これらはコミュニティ共有のフィールドで、自分のアカウントに追加するものです — 組み込みではありません。
+有効化するには:
+
+1. Intervals.icu で **Settings → Sports Settings → Run → Custom Fields →
+   Activity fields** を開きます。
+2. 検索ボックスで、次の 3 つのフィールドをそれぞれ探して追加します:
+
+   | 表示名 | フィールドコード（本サーバが読み取る） | 共有者 |
+   |---|---|---|
+   | Stryd LBSS mod | `StrydLBSSmod` | miguell |
+   | Stryd ILR | `StrydILR` | Knuefi |
+   | Stryd ILR @Treshold | `StrydILRTreshold` | miguell |
+
+   `StrydLBSSmod`（Lower Body Stress Score）は LBSS ベースの PMC が依拠するフィールドです。
+   `StrydILR` / `StrydILRTreshold` は Impact Loading Rate（衝撃負荷率）の指標を追加します。
+   フィールドコードは **`Treshold` の綴りを含めて**正確に一致させる必要があります — それが実際の
+   フィールド名です。
+
+3. 追加すると、これらの値は**新しい Run アクティビティ**にコピーされるので、`get_current_pmc`、
+   `get_weekly_summary`、`get_phase_summary`、および `get_activity_detail` /
+   `search_similar_activities` の ILR フィールドにデータが入るようになります。
+
+**過去のアクティビティについて。** 新しいアクティビティには自動でこれらのフィールドが付きます。
+Stryd の LBSS/ILR データは概ね **2025 年 11 月**以降でのみ利用可能なので、それより古いアクティビティには
+いずれにせよ付きません。その範囲内のアクティビティについては、Intervals.icu で再処理することで値を
+バックフィルできます。
+
+> `Stryd ILR @Treshold` はさらに、"ILR@CP Calculator" カスタムフィールドが正しく設定されていることに
+> 依存します — そのフィールド自身の説明（Intervals.icu 内）を参照してください。
 
 ## クライアントの接続
 

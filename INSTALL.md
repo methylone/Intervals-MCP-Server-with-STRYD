@@ -18,9 +18,9 @@ into an AI assistant and have it do the setup for you (see
   ID to `0`, which means "the owner of this API key".
 - **(Optional) Stryd extension.** The `get_current_pmc`, `get_weekly_summary`, and
   `get_phase_summary` tools use Stryd load metrics (LBSS / ILR). These require a
-  Stryd power meter **and** the corresponding Intervals.icu custom fields (e.g.
-  `StrydLBSSmod`) to be present on your activities. **The core tools work without
-  Stryd** — the extension simply adds power-based PMC on top.
+  Stryd power meter **and** three Intervals.icu custom fields — see
+  [Setting up the Stryd custom fields](#setting-up-the-stryd-custom-fields-optional).
+  **The core tools work without Stryd** — the extension simply adds power-based PMC on top.
 - **(Optional) Weather metric.** The `average_feels_like` value used by
   `search_similar_activities` comes from Open-Meteo enrichment in Intervals.icu;
   activities without weather are excluded when a temperature filter is set.
@@ -69,6 +69,37 @@ All optional variables are documented in `.env.example`. Two worth calling out:
   stream cache entirely (always fetch fresh). You can also toggle this at runtime
   from the chat with the `set_cache_enabled` tool; the runtime state resets to this
   value on restart.
+
+### Setting up the Stryd custom fields (optional)
+
+The Stryd extension reads three Intervals.icu **custom activity fields**. These are
+community-shared fields you add to your own account — they are not built in. To enable them:
+
+1. In Intervals.icu, go to **Settings → Sports Settings → Run → Custom Fields →
+   Activity fields**.
+2. Use the search box to find and add each of these three fields:
+
+   | Display name | Field code (read by this server) | Shared by |
+   |---|---|---|
+   | Stryd LBSS mod | `StrydLBSSmod` | miguell |
+   | Stryd ILR | `StrydILR` | Knuefi |
+   | Stryd ILR @Treshold | `StrydILRTreshold` | miguell |
+
+   `StrydLBSSmod` (Lower Body Stress Score) is the field the LBSS-based PMC is built on;
+   `StrydILR` / `StrydILRTreshold` add the Impact Loading Rate metrics. The field codes —
+   **including the `Treshold` spelling** — must match exactly; that is the real field name.
+
+3. Once added, these values are copied onto **new Run activities**, so `get_current_pmc`,
+   `get_weekly_summary`, `get_phase_summary`, and the ILR fields in `get_activity_detail`
+   / `search_similar_activities` will have data to work with.
+
+**Historical activities.** New activities get these fields automatically. Stryd LBSS/ILR
+data is only available from around **November 2025** onward, so older activities won't have
+it regardless; for activities within that range you can backfill the values by re-processing
+them in Intervals.icu.
+
+> `Stryd ILR @Treshold` additionally relies on an "ILR@CP Calculator" custom field to be set
+> correctly — see that field's own description in Intervals.icu.
 
 ## Connecting a client
 
