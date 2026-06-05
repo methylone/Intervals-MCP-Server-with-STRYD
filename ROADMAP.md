@@ -3,6 +3,11 @@
 This is a personal project shared as-is — there is no fixed timeline and the
 direction may change. The two items below are the planned next steps, **in order**.
 
+Tracked as GitHub issues / milestones:
+[#1 Phase 1 — CLI](https://github.com/methylone/Intervals-MCP-Server-with-STRYD/issues/1) ·
+[#2 Phase 2 — decoupling](https://github.com/methylone/Intervals-MCP-Server-with-STRYD/issues/2) ·
+[milestones](https://github.com/methylone/Intervals-MCP-Server-with-STRYD/milestones).
+
 ## 1. CLI front-end (simple first)
 
 Add a command-line entry point so the tools can be invoked directly from a shell,
@@ -15,6 +20,8 @@ not only over MCP. A single multi-call binary would dispatch on `argv`:
 The first cut is deliberately a **thin shim** over the existing tool registry. Its
 purpose is to validate that a CLI is genuinely useful as a *second consumer* of the
 same tools — before any tool code is restructured.
+
+Tracked in [#1](https://github.com/methylone/Intervals-MCP-Server-with-STRYD/issues/1).
 
 ## 2. Transport-agnostic decoupling
 
@@ -30,6 +37,8 @@ CLI, and for whatever comes next. The payoff is a single source of truth per too
 (fewer "fixed it in one place but not the other" bugs) and the freedom to follow the
 protocol-of-the-month without rewriting domain logic — MCP is still young, and this
 project already migrated stdio → Streamable HTTP once.
+
+Tracked in [#2](https://github.com/methylone/Intervals-MCP-Server-with-STRYD/issues/2).
 
 **Sequence:** ship the CLI shim (1) to prove the second-consumer value, then do the
 decoupling (2) as the real maintainability fix.
