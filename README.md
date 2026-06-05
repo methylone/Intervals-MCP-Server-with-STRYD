@@ -48,8 +48,15 @@ INSTALL.md.
 - [INSTALL.md](INSTALL.md) — prerequisites and client setup
 - [ARCHITECTURE.md](ARCHITECTURE.md) — code layout and how to extend it
 - [SECURITY.md](SECURITY.md) — **read before using HTTP mode**
+- [ROADMAP.md](ROADMAP.md) — what's planned next
 - [`training-knowledge-template/`](training-knowledge-template/) — build your own
   analysis knowledge for your AI client
+
+## Roadmap
+
+Planned next, in order: **(1)** a simple CLI front-end so the tools can be run from a
+shell as well as over MCP, then **(2)** decoupling the tool definitions from the MCP
+transport so the same tools can back multiple front-ends. See [ROADMAP.md](ROADMAP.md).
 
 ## Security
 
