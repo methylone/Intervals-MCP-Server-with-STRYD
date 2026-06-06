@@ -8,6 +8,7 @@ import { isInitializeRequest } from "@modelcontextprotocol/sdk/types.js";
 import express from "express";
 import { randomUUID } from "node:crypto";
 import { pathToFileURL } from "node:url";
+import { realpathSync } from "node:fs";
 import { TOOLS } from "./tool-registry.js";
 import { registerToolDef } from "./adapters/mcp.js";
 import { buildServerInstructions } from "./instructions.js";
@@ -33,7 +34,12 @@ function createServer(): McpServer {
 
 export { createServer };
 
-const isMain = !!process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href;
+// Resolve argv[1] through realpath so "run as main" is still detected when the
+// process is launched via an npm/npx bin **symlink**: argv[1] is the symlink path
+// while import.meta.url is the real module path, so a raw compare would be false
+// and the server/CLI would silently do nothing.
+const entryPath = process.argv[1];
+const isMain = !!entryPath && import.meta.url === pathToFileURL(realpathSync(entryPath)).href;
 
 if (isMain) {
   // Config is validated lazily (so the CLI can list tools without creds); the

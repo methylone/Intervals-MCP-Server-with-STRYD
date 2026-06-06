@@ -6,6 +6,7 @@
 // index.ts / createServer, so the CLI is free of the MCP/express composition
 // root (verifiable: `node build/cli.js` does not transitively import express).
 import { pathToFileURL } from "node:url";
+import { realpathSync } from "node:fs";
 import { TOOLS } from "./tool-registry.js";
 import { runToolDef } from "./adapters/cli.js";
 
@@ -143,7 +144,12 @@ export async function main(argv: string[], io: CliIo = defaultIo): Promise<numbe
   }
 }
 
-const isMain = !!process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href;
+// Resolve argv[1] through realpath so "run as main" is still detected when the
+// CLI is launched via an npm/npx bin **symlink**: argv[1] is the symlink path while
+// import.meta.url is the real module path, so a raw compare would be false and the
+// CLI would silently do nothing.
+const entryPath = process.argv[1];
+const isMain = !!entryPath && import.meta.url === pathToFileURL(realpathSync(entryPath)).href;
 
 if (isMain) {
   main(process.argv.slice(2))
