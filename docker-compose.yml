@@ -10,7 +10,10 @@
 
 services:
   intervals-mcp:
-    build: .
+    build:
+      context: .
+      args:
+        BUILD_SHA: ${BUILD_SHA:-unknown}
     container_name: intervals-mcp
     restart: unless-stopped
     ports:

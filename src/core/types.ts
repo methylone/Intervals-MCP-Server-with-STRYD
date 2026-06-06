@@ -72,7 +72,7 @@ export type Activity = {
   // --- Nutrition ---
   /** Carbohydrates ingested during activity (grams). Intervals.icu field: `carbs_ingested`. */
   carbs_ingested?: number | null;
-  /** Carbohydrates oxidized/used during activity (grams). Not used by FR-NUTR-01. */
+  /** Carbohydrates oxidized/used during activity (grams). Intervals.icu field: `carbs_used`. */
   carbs_used?: number | null;
 } & Record<string, unknown>;
 
@@ -128,18 +128,6 @@ export type Wellness = {
   /** ATL at this date (RSS-based) */
   atl?: number;
   tsb?: number;
-
-  // --- Derived nutrition fields (computed by get_wellness, FR-NUTR-01) ---
-  /** Sum of 5 meal kcal fields (null treated as 0). Always number. */
-  cal_diet_total?: number;
-  /** CalBreakfast, CalLunch, CalDinner all non-null (0 is non-null). */
-  cal_diet_main_meals_complete?: boolean;
-  /** Count of non-null among 5 meal fields. 0-5. */
-  cal_diet_recorded_count?: number;
-  /** Same-date activities' carbohydrates × 4. NULL iff activity fetch failed. */
-  cal_workout_intake?: number | null;
-  /** cal_diet_total + cal_workout_intake. NULL iff cal_workout_intake is null. */
-  cal_intake_total?: number | null;
 } & Record<string, unknown>;
 
 // ---------------------------------------------------------------------------

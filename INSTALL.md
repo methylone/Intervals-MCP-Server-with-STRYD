@@ -25,11 +25,59 @@ into an AI assistant and have it do the setup for you (see
   `search_similar_activities` comes from Open-Meteo enrichment in Intervals.icu;
   activities without weather are excluded when a temperature filter is set.
 
-## Setup
+## Install via MCPB (Claude Desktop, easiest)
+
+Claude Desktop can install this server from a single `.mcpb` bundle — no clone, no Node
+setup. Download `intervals-mcp-with-stryd.mcpb` from the
+[latest release](https://github.com/methylone/Intervals-MCP-Server-with-STRYD/releases),
+double-click it, and Claude Desktop will prompt for three values:
+
+- **Athlete ID** — `i…` (or `0`, the API key owner).
+- **API key** — from Intervals.icu *Settings → Developer*. It is marked sensitive and
+  stored in your **OS keychain**, not in a plaintext file.
+- **Timezone** — IANA name (optional; default `UTC`).
+
+For the **Stryd** tools to return data you still need the custom fields in
+[Setting up the Stryd custom fields](#setting-up-the-stryd-custom-fields-optional); the
+server install itself needs nothing else.
+
+## Install via npx
+
+If your client launches MCP servers by command (Claude Desktop, Codex, …), run the
+published npm package directly — no clone, no build:
+
+```json
+{
+  "mcpServers": {
+    "intervals": {
+      "command": "npx",
+      "args": ["-y", "intervals-mcp-with-stryd"],
+      "env": {
+        "INTERVALS_ATHLETE_ID": "i0000000",
+        "INTERVALS_API_KEY": "your-api-key",
+        "ATHLETE_TIMEZONE": "Asia/Tokyo",
+        "CACHE_DIR": "/absolute/path/to/intervals-cache"
+      }
+    }
+  }
+}
+```
+
+`CACHE_DIR` is optional but recommended here. The on-disk stream cache resolves to a
+path under the server's install location; under `npx` that is the **volatile npx package
+cache**, so point `CACHE_DIR` at a stable absolute directory if you want the cache to
+persist across runs. (Only activity *streams* are cached; PMC / wellness / activities are
+always fetched live.) The npm package also installs an `intervals-mcp` CLI on your
+`PATH` — see [docs/CLI.md](docs/CLI.md).
+
+For the Stryd extension, add the custom fields in
+[Setting up the Stryd custom fields](#setting-up-the-stryd-custom-fields-optional).
+
+## Install from source (development / HTTP / Docker)
 
 ```bash
 # 1. Clone
-git clone <this-repository-url> intervals-mcp-server
+git clone https://github.com/methylone/Intervals-MCP-Server-with-STRYD.git intervals-mcp-server
 cd intervals-mcp-server
 
 # 2. Install dependencies

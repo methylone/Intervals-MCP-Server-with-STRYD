@@ -20,6 +20,9 @@ Streamable HTTP トランスポート（`MCP_TRANSPORT=http`）は**アプリケ
 
 - Intervals.icu の API key と athlete ID は **`.env` の中だけ**に置きます。`.env` は gitignore
   されています。決してコミットしないでください。
+- **MCPB インストール（Claude Desktop）の場合:** API key はバンドルの manifest で `sensitive`
+  と宣言されるため、Claude Desktop は平文の設定ファイルではなく **OS キーチェーン**に保管します。
+  これは key の*保管場所*が変わるだけで、サーバの攻撃面（HTTP のアプリ層認証なし等）は変わりません。
 - `.env.example` にはプレースホルダのみが含まれます — `.env` にコピーし、実際の値はローカルで
   記入してください。
 - クライアント設定を貼り付けるときや AI アシスタントにセットアップを依頼するときは、実際の

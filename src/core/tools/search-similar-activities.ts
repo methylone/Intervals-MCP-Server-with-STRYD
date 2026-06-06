@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 import { z } from "zod";
-import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
+import type { ToolDef, ToolContext } from "../../tool-registry.js";
 import { intervalsClient } from "../intervals-client.js";
 import type { Activity } from "../types.js";
 
@@ -19,20 +19,18 @@ function avgOrNull(values: (number | null | undefined)[]): number | null {
   return Math.round((nums.reduce((a, b) => a + b, 0) / nums.length) * 10) / 10;
 }
 
-export function registerSearchSimilarActivities(server: McpServer): void {
-  server.registerTool(
-    "search_similar_activities",
-    {
-      title: "Search Similar Activities",
-      description:
-        "Search past activities within a date range using optional filters " +
-        "(type, name keyword, distance, duration, temperature). Returns matching activities " +
-        "with derived metrics (pace, efficiency factor, weather) and aggregate summary. " +
-        "Useful for estimating LBSS/RSS of planned sessions based on similar past efforts, " +
-        "and for comparing performance across different temperature conditions. " +
-        "Temperature filters use feels-like temp (Open-Meteo). Activities without weather data " +
-        "(has_weather=false) are excluded when temp filters are set.",
-      inputSchema: {
+export const searchSimilarActivitiesTool: ToolDef = {
+  name: "search_similar_activities",
+  title: "Search Similar Activities",
+  description:
+    "Search past activities within a date range using optional filters " +
+    "(type, name keyword, distance, duration, temperature). Returns matching activities " +
+    "with derived metrics (pace, efficiency factor, weather) and aggregate summary. " +
+    "Useful for estimating LBSS/RSS of planned sessions based on similar past efforts, " +
+    "and for comparing performance across different temperature conditions. " +
+    "Temperature filters use feels-like temp (Open-Meteo). Activities without weather data " +
+    "(has_weather=false) are excluded when temp filters are set.",
+  schema: {
         oldest: z
           .string()
           .regex(/^\d{4}-\d{2}-\d{2}$/, "Must be YYYY-MM-DD")
@@ -83,9 +81,8 @@ export function registerSearchSimilarActivities(server: McpServer): void {
           .positive()
           .optional()
           .describe("Maximum number of results to return (default: 20)"),
-      },
-    },
-    async ({
+  },
+  handler: async ({
       oldest,
       newest,
       type,
@@ -98,8 +95,21 @@ export function registerSearchSimilarActivities(server: McpServer): void {
       temp_max_celsius,
       sort_by = "date",
       limit = 20,
-    }) => {
-      const raw = await intervalsClient.getActivities(oldest, newest);
+    }: {
+      oldest: string;
+      newest: string;
+      type?: string;
+      name_contains?: string;
+      distance_min_km?: number;
+      distance_max_km?: number;
+      duration_min_minutes?: number;
+      duration_max_minutes?: number;
+      temp_min_celsius?: number;
+      temp_max_celsius?: number;
+      sort_by?: "date" | "distance" | "rss" | "lbss";
+      limit?: number;
+    }, ctx?: ToolContext) => {
+      const raw = await intervalsClient.getActivities(oldest, newest, { signal: ctx?.signal });
       const activities = raw as Activity[];
 
       // Build filter descriptions
@@ -241,14 +251,6 @@ export function registerSearchSimilarActivities(server: McpServer): void {
         summary,
       };
 
-      return {
-        content: [
-          {
-            type: "text",
-            text: JSON.stringify(result, null, 2),
-          },
-        ],
-      };
-    }
-  );
-}
+    return result;
+  },
+};

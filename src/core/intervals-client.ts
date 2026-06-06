@@ -4,6 +4,12 @@ import { cacheGet, cacheSet } from "./cache.js";
 import type { ActivityStreamRaw, CalendarEvent, CreateEventInput, UpdateEventInput } from "./types.js";
 
 const BASE_URL = "https://intervals.icu/api/v1";
+const DEFAULT_REQUEST_TIMEOUT_MS = 60_000;
+
+type RequestOptions = {
+  signal?: AbortSignal;
+  timeoutMs?: number;
+};
 
 function buildAuthHeader(): string {
   const credentials = `API_KEY:${config_.apiKey}`;
@@ -14,6 +20,8 @@ async function request<T>(path: string, options?: {
   method?: string;
   params?: Record<string, string>;
   body?: unknown;
+  signal?: AbortSignal;
+  timeoutMs?: number;
 }): Promise<T> {
   const url = new URL(`${BASE_URL}${path}`);
   if (options?.params) {
@@ -30,11 +38,43 @@ async function request<T>(path: string, options?: {
     headers["Content-Type"] = "application/json";
   }
 
-  const response = await fetch(url.toString(), {
-    method: options?.method ?? "GET",
-    headers,
-    ...(options?.body !== undefined ? { body: JSON.stringify(options.body) } : {}),
-  });
+  const controller = new AbortController();
+  const timeoutMs = options?.timeoutMs ?? DEFAULT_REQUEST_TIMEOUT_MS;
+  let timeoutId: ReturnType<typeof setTimeout> | undefined;
+  const abortFromParent = () => {
+    controller.abort(options?.signal?.reason ?? "Caller aborted request");
+  };
+
+  if (options?.signal?.aborted) {
+    abortFromParent();
+  } else {
+    options?.signal?.addEventListener("abort", abortFromParent, { once: true });
+  }
+
+  if (timeoutMs > 0) {
+    timeoutId = setTimeout(() => {
+      controller.abort(`Intervals.icu API request timed out after ${timeoutMs}ms`);
+    }, timeoutMs);
+  }
+
+  let response: Response;
+  try {
+    response = await fetch(url.toString(), {
+      method: options?.method ?? "GET",
+      headers,
+      signal: controller.signal,
+      ...(options?.body !== undefined ? { body: JSON.stringify(options.body) } : {}),
+    });
+  } catch (err) {
+    if (controller.signal.aborted) {
+      const reason = controller.signal.reason;
+      throw new Error(`Intervals.icu API request aborted: ${reason instanceof Error ? reason.message : String(reason)}`);
+    }
+    throw err;
+  } finally {
+    if (timeoutId !== undefined) clearTimeout(timeoutId);
+    options?.signal?.removeEventListener("abort", abortFromParent);
+  }
 
   if (!response.ok) {
     const body = await response.text().catch(() => "");
@@ -52,60 +92,63 @@ async function request<T>(path: string, options?: {
 }
 
 /** Backwards-compatible GET helper */
-async function get<T>(path: string, params?: Record<string, string>): Promise<T> {
-  return request<T>(path, { params });
+async function get<T>(path: string, params?: Record<string, string>, options?: RequestOptions): Promise<T> {
+  return request<T>(path, { params, ...options });
 }
 
 export const intervalsClient = {
-  getActivities(oldest: string, newest: string): Promise<unknown[]> {
+  getActivities(oldest: string, newest: string, options?: RequestOptions): Promise<unknown[]> {
     return get<unknown[]>(`/athlete/${config_.athleteId}/activities`, {
       oldest,
       newest,
-    });
+    }, options);
   },
 
-  getActivityDetail(activityId: string): Promise<unknown> {
-    return get<unknown>(`/activity/${activityId}`);
+  getActivityDetail(activityId: string, options?: RequestOptions): Promise<unknown> {
+    return get<unknown>(`/activity/${activityId}`, undefined, options);
   },
 
-  getWellness(oldest: string, newest: string): Promise<unknown[]> {
+  getWellness(oldest: string, newest: string, options?: RequestOptions): Promise<unknown[]> {
     return get<unknown[]>(`/athlete/${config_.athleteId}/wellness`, {
       oldest,
       newest,
-    });
+    }, options);
   },
 
-  getAthleteSummary(start: string, end: string): Promise<unknown> {
+  getAthleteSummary(start: string, end: string, options?: RequestOptions): Promise<unknown> {
     return get<unknown>(`/athlete/${config_.athleteId}/athlete-summary`, {
       start,
       end,
-    });
+    }, options);
   },
 
-  getEvents(oldest: string, newest: string): Promise<unknown[]> {
+  getEvents(oldest: string, newest: string, options?: RequestOptions): Promise<unknown[]> {
     return get<unknown[]>(`/athlete/${config_.athleteId}/events`, {
       oldest,
       newest,
-    });
+    }, options);
   },
 
-  createEvent(event: CreateEventInput): Promise<CalendarEvent> {
+  createEvent(event: CreateEventInput, options?: RequestOptions): Promise<CalendarEvent> {
     return request<CalendarEvent>(`/athlete/${config_.athleteId}/events`, {
       method: "POST",
       body: event,
+      ...options,
     });
   },
 
-  updateEvent(eventId: number, updates: UpdateEventInput): Promise<CalendarEvent> {
+  updateEvent(eventId: number, updates: UpdateEventInput, options?: RequestOptions): Promise<CalendarEvent> {
     return request<CalendarEvent>(`/athlete/${config_.athleteId}/events/${eventId}`, {
       method: "PUT",
       body: updates,
+      ...options,
     });
   },
 
-  async deleteEvent(eventId: number): Promise<void> {
+  async deleteEvent(eventId: number, options?: RequestOptions): Promise<void> {
     await request<void>(`/athlete/${config_.athleteId}/events/${eventId}`, {
       method: "DELETE",
+      ...options,
     });
   },
 
@@ -114,7 +157,7 @@ export const intervalsClient = {
    * types 省略 → stored streams のみ返却
    * types 指定 → computed streams (fixed_heartrate, fixed_watts 等) も取得可能
    */
-  async getActivityStreams(activityId: string, types?: string[]): Promise<ActivityStreamRaw[]> {
+  async getActivityStreams(activityId: string, types?: string[], options?: RequestOptions): Promise<ActivityStreamRaw[]> {
     // Try cache first
     const cached = await cacheGet(activityId);
     if (cached !== null) {
@@ -126,7 +169,7 @@ export const intervalsClient = {
     if (types && types.length > 0) {
       params.types = types.join(",");
     }
-    const streams = await get<ActivityStreamRaw[]>(`/activity/${activityId}/streams.json`, params);
+    const streams = await get<ActivityStreamRaw[]>(`/activity/${activityId}/streams.json`, params, options);
 
     // Write to cache (best-effort, don't await blocking)
     cacheSet(activityId, streams).catch(() => {});

@@ -1,0 +1,149 @@
+{
+  "manifest_version": "0.3",
+  "name": "intervals-mcp-with-stryd",
+  "display_name": "Intervals MCP with STRYD",
+  "version": "0.3.0",
+  "description": "An Intervals.icu MCP server built for Stryd runners — power-based running analysis (a dual PMC with RSS and LBSS), designed so the LLM never does the math.",
+  "author": {
+    "name": "methylone"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/methylone/Intervals-MCP-Server-with-STRYD.git"
+  },
+  "homepage": "https://github.com/methylone/Intervals-MCP-Server-with-STRYD#readme",
+  "support": "https://github.com/methylone/Intervals-MCP-Server-with-STRYD/issues",
+  "license": "AGPL-3.0-or-later",
+  "keywords": [
+    "mcp",
+    "model-context-protocol",
+    "intervals-icu",
+    "stryd",
+    "running",
+    "training-load",
+    "lbss",
+    "ultramarathon"
+  ],
+  "server": {
+    "type": "node",
+    "entry_point": "build/index.js",
+    "mcp_config": {
+      "command": "node",
+      "args": [
+        "${__dirname}/build/index.js"
+      ],
+      "env": {
+        "INTERVALS_ATHLETE_ID": "${user_config.athlete_id}",
+        "INTERVALS_API_KEY": "${user_config.api_key}",
+        "ATHLETE_TIMEZONE": "${user_config.timezone}",
+        "CACHE_DIR": "${HOME}/.intervals-mcp-with-stryd/cache/streams"
+      }
+    }
+  },
+  "user_config": {
+    "athlete_id": {
+      "type": "string",
+      "title": "Intervals.icu Athlete ID",
+      "description": "Your athlete ID (starts with \"i\", e.g. i12345678), from the Intervals.icu URL or Settings. You may also use \"0\" for the API key owner.",
+      "required": true
+    },
+    "api_key": {
+      "type": "string",
+      "title": "Intervals.icu API Key",
+      "description": "API key from Intervals.icu → Settings → Developer. Stored in your OS keychain.",
+      "required": true,
+      "sensitive": true
+    },
+    "timezone": {
+      "type": "string",
+      "title": "Athlete Timezone (IANA)",
+      "description": "IANA timezone name, e.g. Asia/Tokyo or UTC. Affects \"today\" and Mon–Sun week boundaries.",
+      "required": false,
+      "default": "UTC"
+    }
+  },
+  "compatibility": {
+    "platforms": [
+      "darwin",
+      "win32",
+      "linux"
+    ],
+    "runtimes": {
+      "node": ">=20.12.0"
+    }
+  },
+  "tools_generated": false,
+  "tools": [
+    {
+      "name": "get_activities",
+      "description": "Fetch a list of Intervals.icu activities for a date range."
+    },
+    {
+      "name": "get_activity_detail",
+      "description": "Fetch complete data for a single Intervals.icu activity, including power/HR zone distributions (icu_zone_times, icu_hr_zone_times), Stryd metrics (StrydLBSSmod, StrydILR), decoupling, and all other fields."
+    },
+    {
+      "name": "get_activity_streams_summary",
+      "description": "Fetch activity stream data, clean/split/aggregate, and return a summary with splits, cardiac decoupling, and efficiency metrics."
+    },
+    {
+      "name": "search_similar_activities",
+      "description": "Search past activities within a date range using optional filters (type, name keyword, distance, duration, temperature)."
+    },
+    {
+      "name": "get_wellness",
+      "description": "Fetch daily wellness data for a date range from Intervals.icu."
+    },
+    {
+      "name": "get_athlete_summary",
+      "description": "Fetch an aggregated athlete summary for a date range from Intervals.icu."
+    },
+    {
+      "name": "get_events",
+      "description": "Fetch calendar events (planned workouts, races, notes) from Intervals.icu for a date range."
+    },
+    {
+      "name": "create_events",
+      "description": "Create one or more calendar events (planned workouts, races, notes) on Intervals.icu."
+    },
+    {
+      "name": "update_event",
+      "description": "Update an existing calendar event on Intervals.icu."
+    },
+    {
+      "name": "delete_event",
+      "description": "Delete a calendar event from Intervals.icu."
+    },
+    {
+      "name": "delete_events",
+      "description": "Delete multiple calendar events from Intervals.icu in one call."
+    },
+    {
+      "name": "get_hrv_trends",
+      "description": "Calculate rolling HRV statistics (mean, SD, coefficient of variation) for recovery trend analysis."
+    },
+    {
+      "name": "clear_cache",
+      "description": "Clear the on-disk stream cache (all cached activities, or a single one)."
+    },
+    {
+      "name": "set_cache_enabled",
+      "description": "Turn the on-disk stream cache on or off at runtime, or query its current state."
+    },
+    {
+      "name": "get_current_pmc",
+      "description": "Get today's Performance Management Chart (PMC) values."
+    },
+    {
+      "name": "get_weekly_summary",
+      "description": "Get a weekly training summary for a given week (Mon–Sun)."
+    },
+    {
+      "name": "get_phase_summary",
+      "description": "Get a training phase summary with per-week breakdown and ramp rate analysis."
+    }
+  ],
+  "privacy_policies": [
+    "https://intervals.icu/privacy"
+  ]
+}

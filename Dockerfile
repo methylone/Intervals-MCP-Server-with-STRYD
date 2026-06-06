@@ -12,10 +12,12 @@ RUN npm run build
 
 # ---- runtime stage: production deps + compiled output only ----
 FROM node:22-alpine AS runtime
+ARG BUILD_SHA=unknown
 ENV NODE_ENV=production \
     MCP_TRANSPORT=http \
     MCP_PORT=8080 \
-    CACHE_DIR=/data/cache/streams
+    CACHE_DIR=/data/cache/streams \
+    BUILD_SHA=${BUILD_SHA}
 WORKDIR /app
 
 COPY package.json package-lock.json ./

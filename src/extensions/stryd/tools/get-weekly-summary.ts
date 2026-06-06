@@ -12,7 +12,7 @@
  */
 
 import { z } from "zod";
-import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
+import type { ToolDef, ToolContext } from "../../../tool-registry.js";
 import { intervalsClient } from "../../../core/intervals-client.js";
 import type { Activity, Wellness } from "../../../core/types.js";
 import { addDays } from "../../../utils/date.js";
@@ -44,34 +44,31 @@ function round(value: number | null, decimals: number): number | null {
   return Math.round(value * factor) / factor;
 }
 
-export function registerGetWeeklySummary(server: McpServer): void {
-  server.registerTool(
-    "get_weekly_summary",
-    {
-      title: "Get Weekly Summary",
-      description:
-        "Get a weekly training summary for a given week (Mon–Sun). " +
-        "Returns:\n" +
-        "- totals: RSS, LBSS, total time (min), total distance (km)\n" +
-        "- averages: ILR, decoupling (from sessions that have the field)\n" +
-        "- pmc_end_of_week: CTL/ATL/TSB at Sunday for both RSS and LBSS\n" +
-        "- sessions: per-activity breakdown sorted by date\n" +
-        "Note: LBSS values require Stryd data synced to Intervals (post Nov 2025).",
-      inputSchema: {
-        week_start: z
-          .string()
-          .regex(/^\d{4}-\d{2}-\d{2}$/, "Must be YYYY-MM-DD")
-          .describe("Monday of the target week (YYYY-MM-DD)"),
-      },
-    },
-    async ({ week_start: weekStart }) => {
+export const getWeeklySummaryTool: ToolDef = {
+  name: "get_weekly_summary",
+  title: "Get Weekly Summary",
+  description:
+    "Get a weekly training summary for a given week (Mon–Sun). " +
+    "Returns:\n" +
+    "- totals: RSS, LBSS, total time (min), total distance (km)\n" +
+    "- averages: ILR, decoupling (from sessions that have the field)\n" +
+    "- pmc_end_of_week: CTL/ATL/TSB at Sunday for both RSS and LBSS\n" +
+    "- sessions: per-activity breakdown sorted by date\n" +
+    "Note: LBSS values require Stryd data synced to Intervals (post Nov 2025).",
+  schema: {
+    week_start: z
+      .string()
+      .regex(/^\d{4}-\d{2}-\d{2}$/, "Must be YYYY-MM-DD")
+      .describe("Monday of the target week (YYYY-MM-DD)"),
+  },
+  handler: async ({ week_start: weekStart }: { week_start: string }, ctx?: ToolContext) => {
       const weekEnd = addDays(weekStart, 6); // Sunday
       const warmupStart = addDays(weekStart, -WARMUP_DAYS);
 
       // wellness（週内のみ）と activities（助走含む）を並列取得
       const [rawActivities, rawWellness] = await Promise.all([
-        intervalsClient.getActivities(warmupStart, weekEnd),
-        intervalsClient.getWellness(weekStart, weekEnd),
+        intervalsClient.getActivities(warmupStart, weekEnd, { signal: ctx?.signal }),
+        intervalsClient.getWellness(weekStart, weekEnd, { signal: ctx?.signal }),
       ]);
 
       const allActivities = rawActivities as Activity[];
@@ -161,14 +158,6 @@ export function registerGetWeeklySummary(server: McpServer): void {
         sessions,
       };
 
-      return {
-        content: [
-          {
-            type: "text",
-            text: JSON.stringify(result, null, 2),
-          },
-        ],
-      };
-    },
-  );
-}
+    return result;
+  },
+};

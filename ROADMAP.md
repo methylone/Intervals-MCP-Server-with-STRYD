@@ -1,44 +1,34 @@
 # Roadmap
 
 This is a personal project shared as-is — there is no fixed timeline and the
-direction may change. The two items below are the planned next steps, **in order**.
+direction may change.
 
-Tracked as GitHub issues / milestones:
-[#1 Phase 1 — CLI](https://github.com/methylone/Intervals-MCP-Server-with-STRYD/issues/1) ·
-[#2 Phase 2 — decoupling](https://github.com/methylone/Intervals-MCP-Server-with-STRYD/issues/2) ·
-[milestones](https://github.com/methylone/Intervals-MCP-Server-with-STRYD/milestones).
+## Shipped
 
-## 1. CLI front-end (simple first)
+The two items that were "planned next" are now in the codebase:
 
-Add a command-line entry point so the tools can be invoked directly from a shell,
-not only over MCP. A single multi-call binary would dispatch on `argv`:
+- **CLI front-end** — the tools can be run directly from a shell via the
+  `intervals-mcp` binary (`intervals-mcp list`, `intervals-mcp <tool> '<json>'`),
+  not only over MCP. See [docs/CLI.md](docs/CLI.md).
+- **Transport-agnostic decoupling** — tool definitions are now transport-free
+  (`ToolDef`: a handler returns plain data; thin per-surface adapters render it for
+  MCP and for the CLI). A single source of truth per tool, free of the MCP content
+  envelope. See [ARCHITECTURE.md](ARCHITECTURE.md).
 
-- `intervals serve` (or `--http`) — run as the MCP server / HTTP daemon (today's behavior)
-- `intervals <tool> --<arg> …` — run one tool and print its result
-- `intervals help` — list the available tools and their arguments
+Distribution also landed: an npm package (`intervals-mcp-with-stryd`, `npx` one-line
+setup) and an MCPB bundle for one-click Claude Desktop install with the API key held
+in the OS keychain.
 
-The first cut is deliberately a **thin shim** over the existing tool registry. Its
-purpose is to validate that a CLI is genuinely useful as a *second consumer* of the
-same tools — before any tool code is restructured.
+## Planned next
 
-Tracked in [#1](https://github.com/methylone/Intervals-MCP-Server-with-STRYD/issues/1).
+- **Structured-interval block boundaries.** Today `split_method: "km"` approximates
+  workout structure, but short rests (under ~1 km / ~3 min) get absorbed into the
+  surrounding splits. Investigate the Intervals.icu **LAP / Intervals API** to detect
+  real block boundaries automatically, so structured workouts (e.g. 2×20 min tempo)
+  split on their actual blocks rather than on distance.
+- **Methodology notes in the server instructions.** Fold a couple of confirmed field
+  lessons into `instructions.ts` — the Stryd `average_temp` bias (foot-mounted sensor
+  reads several °C above ambient; relative comparison still valid) and the constraint
+  that halves-based decoupling is meaningless on structured intervals.
 
-## 2. Transport-agnostic decoupling
-
-Today each tool handler returns the MCP content envelope
-(`{ content: [{ type: "text", text }] }`), so the tool logic is shaped by the MCP
-protocol. The durable computation layer (the `utils/`, the Stryd LBSS calculator, and
-the Intervals.icu client) is already transport-independent — only the thin handler
-glue is coupled.
-
-The plan is to **decouple tool definitions from any single transport**: handlers
-return plain data, and small per-surface adapters render that data for MCP, for the
-CLI, and for whatever comes next. The payoff is a single source of truth per tool
-(fewer "fixed it in one place but not the other" bugs) and the freedom to follow the
-protocol-of-the-month without rewriting domain logic — MCP is still young, and this
-project already migrated stdio → Streamable HTTP once.
-
-Tracked in [#2](https://github.com/methylone/Intervals-MCP-Server-with-STRYD/issues/2).
-
-**Sequence:** ship the CLI shim (1) to prove the second-consumer value, then do the
-decoupling (2) as the real maintainability fix.
+No fixed dates. Forks are welcome to take any of this further.

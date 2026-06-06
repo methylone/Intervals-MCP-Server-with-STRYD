@@ -22,7 +22,7 @@ This server provides access to Intervals.icu training data for a single athlete.
 5. get_weekly_summary — Mon–Sun aggregated training load (RSS, LBSS, time, distance) and end-of-week PMC values for both RSS and LBSS.
 6. get_phase_summary — Aggregate a multi-week training phase (start_date = Monday, end_date = Sunday). Returns phase totals, per-week breakdown (totals + averages + PMC snapshot for both RSS and LBSS), and trends with CTL ramp rate. Use for block-level analysis (training blocks, e.g., base, build, taper) and ramp rate diagnostics.
 7. get_current_pmc — Today's dual PMC snapshot: RSS-based (from Intervals.icu) and LBSS-based (computed server-side).
-8. get_wellness — Daily wellness data (HRV, resting HR, sleep, weight) for a date range. Also returns derived nutrition fields (cal_diet_total, cal_diet_main_meals_complete, cal_diet_recorded_count, cal_workout_intake, cal_intake_total) aggregating daily meal fields and same-date activity carbohydrates. cal_workout_intake/cal_intake_total are null when activity fetch fails (distinct from 0 = confirmed no activities).
+8. get_wellness — Daily wellness data (HRV, resting HR, sleep, weight) for a date range. Returns the raw Intervals.icu wellness records, including any custom fields the athlete logs (e.g. kcalConsumed).
 9. get_athlete_summary — Athlete-level summary stats for a date range.
 10. get_events — Calendar events (planned workouts, races, notes) for a date range. Optional category filter. Use with get_activities to compare planned vs actual training.
 11. create_events — Create one or more calendar events (planned workouts, races, notes). Accepts an array for batch loading (up to 14 at a time). Use for loading training plans onto the calendar.
@@ -46,7 +46,7 @@ This server provides access to Intervals.icu training data for a single athlete.
 - Need to remove a planned workout? → delete_event
 - Need to clear and reload a week of planned training? → get_events (to find IDs) then delete_events, then create_events
 - Always use get_events first to find event IDs before update/delete.
-- Need daily intake_kcal (meals + activity CHO) for LEA analysis? → get_wellness
+- Need daily recovery/wellness data (HRV, resting HR, sleep, weight, custom logged fields)? → get_wellness
 - Need HRV recovery trends or autonomic stability? → get_hrv_trends (rolling CV%, mean, SD)
 - Re-uploaded a FIT file or re-ran elevation correction and stream analysis looks stale? → clear_cache (all, or one activity_id), then re-run get_activity_streams_summary
 - Want to bypass the stream cache entirely (always fetch fresh), or check whether caching is on? → set_cache_enabled (omit the argument to query)

@@ -9,25 +9,29 @@ training data through well-typed tools.
 
 ```
 src/
-├── index.ts                 # Entry point: builds the MCP server, wires transports (stdio / HTTP)
+├── index.ts                 # MCP composition root: registers TOOLS via registerToolDef, wires transports (stdio / HTTP)
+├── cli.ts                   # CLI composition root: dispatches TOOLS via runToolDef (independent of index.ts)
+├── tool-registry.ts         # ToolDef type + TOOLS array — the single, transport-free source of truth
 ├── config.ts                # Environment-variable validation (Zod). Exports config_
 ├── instructions.ts          # buildServerInstructions(timeZone) — guidance sent to AI clients
+├── adapters/                # Thin per-surface adapters (transport-free; no express / index.ts imports)
+│   ├── mcp.ts               # registerToolDef(server, tool) — Zod parse + MCP content envelope
+│   └── cli.ts               # runToolDef(tool, args, {raw}) — Zod parse + JSON string for stdout
 ├── core/                    # Generic Intervals.icu access (no Stryd-specific logic)
 │   ├── intervals-client.ts  # REST client — single request() helper + a thin method per endpoint
 │   ├── cache.ts             # On-disk stream cache (immutable stream responses)
 │   ├── types.ts             # API response / input types
-│   └── tools/               # One file per MCP tool: registerXxx(server)
+│   └── tools/               # One file per tool: exports xxxTool: ToolDef
 ├── extensions/              # Optional, self-contained add-ons that depend on core/ + utils/
 │   └── stryd/               # Stryd power-meter: LBSS-based PMC, weekly/phase summaries
 │       ├── lbss-calculator.ts
 │       ├── types.ts
-│       └── tools/           # registerXxx(server)
+│       └── tools/           # exports xxxTool: ToolDef
 └── utils/                   # Pure, deterministic helpers (no I/O)
     ├── date.ts              # Civil-date arithmetic + timezone-aware today()/formatDate()
     ├── ema.ts               # Exponential moving average
     ├── stream-processing.ts # Stream splitting / decoupling / EF
-    ├── hrv-trends.ts        # Rolling HRV statistics
-    └── nutrition.ts         # Derived nutrition fields
+    └── hrv-trends.ts        # Rolling HRV statistics
 ```
 
 ## Design principles
@@ -37,10 +41,12 @@ src/
    ILR) lives under `extensions/`, so it can be added or removed independently.
 
 2. **One-way dependencies.** `core/` and `utils/` **never import from
-   `extensions/`**. Extensions import *down* into `core/` and `utils/`. The only
-   place both layers meet is `index.ts`, the composition root that registers every
-   tool. (This invariant is easy to check: `grep -rn "extensions/" src/core src/utils`
-   should return nothing.)
+   `extensions/`**. Extensions import *down* into `core/` and `utils/`. Both layers
+   meet only in `tool-registry.ts`, which collects every tool into `TOOLS` — the
+   single source of truth. The two composition roots, `index.ts` (MCP) and `cli.ts`
+   (CLI), consume `TOOLS` independently and do **not** import each other. (This
+   invariant is easy to check: `grep -rn "extensions/" src/core src/utils` should
+   return nothing.)
 
 3. **Deterministic computation server-side.** EMA / PMC / decoupling and similar
    math are implemented as pure functions in `utils/` (and `extensions/`), unit
@@ -53,24 +59,33 @@ src/
 
 ## Key patterns
 
-### Tool registration — `registerXxx(server)`
+### Tool definition — `export const xxxTool: ToolDef`
 
-Every tool is one file exporting a single `register*` function:
+Every tool is one file exporting a single transport-free `ToolDef`
+(`{ name, title, description, schema, handler }`). The handler returns **raw
+data** — enveloping and formatting belong to the adapters, not the tool:
 
 ```ts
-import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
+import type { ToolDef } from "../../tool-registry.js";
 
-export function registerGetActivities(server: McpServer): void {
-  server.registerTool("get_activities", { /* description, Zod input schema */ },
-    async (args) => {
-      // ... call intervalsClient, shape the result ...
-      return { content: [{ type: "text", text: JSON.stringify(result) }] };
-    });
-}
+export const getActivitiesTool: ToolDef = {
+  name: "get_activities",
+  title: "Get Activities",
+  description: "...",
+  schema: { /* Zod input shape (defaults applied by the adapters' parseAsync) */ },
+  handler: async (args) => {
+    // ... call intervalsClient, shape the result ...
+    return result; // raw data; hard failure → throw
+  },
+};
 ```
 
-`index.ts` imports each `register*` and calls it inside `createServer()`. Adding a
-tool is: create the file, export `registerYourTool`, import + call it in `index.ts`.
+`tool-registry.ts` collects every `xxxTool` into `TOOLS`. The MCP root
+(`index.ts`) registers them via `registerToolDef` (`adapters/mcp.ts`, which wraps
+the result in the MCP content envelope); the CLI root (`cli.ts`) runs them via
+`runToolDef` (`adapters/cli.ts`, which prints the JSON string). Adding a tool is:
+create the file, export `yourTool: ToolDef`, add it to `TOOLS` in
+`tool-registry.ts` — no change to `index.ts` or `cli.ts`.
 
 ### API client — a single `request()` helper
 
@@ -112,18 +127,28 @@ PMC, activities, wellness, events, and every other endpoint are fetched live and
 ## Adding a new extension
 
 1. Create `src/extensions/<name>/` with its own `types.ts`, pure calculators, and a
-   `tools/` directory of `registerXxx(server)` files.
+   `tools/` directory of files each exporting an `xxxTool: ToolDef`.
 2. Import only from `core/` and `utils/` (never the reverse).
-3. Register its tools in `index.ts` under a clearly commented block.
+3. Add its tools to `TOOLS` in `tool-registry.ts` (both surfaces pick them up).
 
-## Transports
+## Surfaces and transports
 
-`index.ts` selects a transport from `MCP_TRANSPORT`:
+Tools are transport-free; each surface is a thin adapter over the shared `TOOLS`
+registry. There are two composition roots:
 
-| Mode | Value | Use |
-|---|---|---|
-| **stdio** (default) | `stdio` | Local client (Claude Desktop / Codex) launches the process directly. Recommended for personal use. |
-| **Streamable HTTP** | `http` | Express server bound to `0.0.0.0:<MCP_PORT>`, endpoints `POST/GET/DELETE /mcp` + `GET /health`. Multi-client, network-accessible. |
+- **MCP server** (`index.ts` + `adapters/mcp.ts`) — the AI-client surface. It
+  selects a transport from `MCP_TRANSPORT`:
+
+  | Mode | Value | Use |
+  |---|---|---|
+  | **stdio** (default) | `stdio` | Local client (Claude Desktop / Codex) launches the process directly. Recommended for personal use. |
+  | **Streamable HTTP** | `http` | Express server bound to `0.0.0.0:<MCP_PORT>`, endpoints `POST/GET/DELETE /mcp` + `GET /health`. Multi-client, network-accessible. |
+
+- **CLI** (`cli.ts` + `adapters/cli.ts`) — a terminal surface for the same tools:
+  `cli list` prints the tool names; `cli <tool> '<json-args>' [--raw]` runs one tool
+  and prints its JSON (pretty by default, compact with `--raw`). stdout carries pure
+  JSON, stderr carries diagnostics, exit codes are `0`/`1`/`2`. `cli.ts` does not
+  import `index.ts`, so the CLI never pulls in express or the MCP machinery.
 
 HTTP mode has **no application-layer authentication** and binds to all interfaces.
 Do **not** expose it to the public internet — see [SECURITY.md](SECURITY.md). For a

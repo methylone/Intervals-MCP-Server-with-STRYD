@@ -19,7 +19,7 @@ Two ideas shaped the design:
 
 1. **Deterministic vs. probabilistic split.** Anything that must be exact —
    Performance Management Chart values, exponential moving averages, decoupling,
-   derived nutrition fields — lives in tested TypeScript, not in the model's head.
+   rolling HRV statistics — lives in tested TypeScript, not in the model's head.
    The server is the deterministic half; the AI client is the probabilistic half.
 
 2. **Code vs. methodology split.** This server knows nothing about *how* to train.
@@ -39,7 +39,7 @@ need through real use before investing in infrastructure. Roughly in order:
   computed server-side, alongside the built-in load metric.
 - Stream-level analysis (splits, cardiac decoupling, terrain-aware pacing).
 - Calendar event create / update / delete for loading training plans.
-- Derived nutrition fields for energy-availability analysis.
+- HRV recovery-trend statistics (rolling mean / SD / CV) for readiness analysis.
 
 A core / extension separation kept the generic parts reusable and the
 power-meter-specific parts optional. A small "tool inventory" test guards against

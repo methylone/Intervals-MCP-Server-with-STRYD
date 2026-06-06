@@ -1,8 +1,8 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 import { z } from "zod";
-import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { intervalsClient } from "../intervals-client.js";
 import type { Activity } from "../types.js";
+import type { ToolDef, ToolContext } from "../../tool-registry.js";
 
 /** Fields omitted from list responses to keep token usage low. */
 const EXCLUDED_FIELDS = new Set([
@@ -46,66 +46,65 @@ function toSummary(activity: Activity): Partial<Activity> {
   return result as Partial<Activity>;
 }
 
-export function registerGetActivities(server: McpServer): void {
-  server.registerTool(
-    "get_activities",
-    {
-      title: "Get Activities",
-      description:
-        "Fetch a list of Intervals.icu activities for a date range. " +
-        "Default 'summary' mode returns only 9 key fields (id, name, type, date, time, distance, RSS, LBSS, elevation) — " +
-        "use this for screening and obtaining activity IDs. " +
-        "Set fields='full' for all fields (large objects still excluded). " +
-        "For filtered searches with aggregate stats, use search_similar_activities instead.",
-      inputSchema: {
-        oldest: z
-          .string()
-          .regex(/^\d{4}-\d{2}-\d{2}$/, "Must be YYYY-MM-DD")
-          .describe("Start date (inclusive), YYYY-MM-DD"),
-        newest: z
-          .string()
-          .regex(/^\d{4}-\d{2}-\d{2}$/, "Must be YYYY-MM-DD")
-          .describe("End date (inclusive), YYYY-MM-DD"),
-        fields: z
-          .enum(["summary", "full"])
-          .default("summary")
-          .describe(
-            'Field set to return. ' +
-            '"summary" (default): id, name, type, start_date_local, moving_time, distance, ' +
-            'icu_training_load, StrydLBSSmod, total_elevation_gain — compact for screening. ' +
-            '"full": all fields except internal large objects (laps, streams, etc).'
-          ),
-        type: z
-          .string()
-          .optional()
-          .describe('Filter by activity type, e.g. "Run", "VirtualRun", "Ride". Case-sensitive, exact match.'),
-      },
-    },
-    async ({ oldest, newest, fields, type }) => {
-      // Zod default may not apply via MCP transport
-      const fieldSet = fields ?? "summary";
+/**
+ * get_activities as a transport-free ToolDef (Stage 2 Phase 0 reference migration).
+ *
+ * The handler returns raw data (the projected array); the transport adapters
+ * own validation/defaults and output enveloping. The previous
+ * `fields ?? "summary"` workaround is gone — defaults are applied by the
+ * adapters' `z.object(schema).parseAsync`.
+ */
+export const getActivitiesTool: ToolDef = {
+  name: "get_activities",
+  title: "Get Activities",
+  description:
+    "Fetch a list of Intervals.icu activities for a date range. " +
+    "Default 'summary' mode returns only 9 key fields (id, name, type, date, time, distance, RSS, LBSS, elevation) — " +
+    "use this for screening and obtaining activity IDs. " +
+    "Set fields='full' for all fields (large objects still excluded). " +
+    "For filtered searches with aggregate stats, use search_similar_activities instead.",
+  schema: {
+    oldest: z
+      .string()
+      .regex(/^\d{4}-\d{2}-\d{2}$/, "Must be YYYY-MM-DD")
+      .describe("Start date (inclusive), YYYY-MM-DD"),
+    newest: z
+      .string()
+      .regex(/^\d{4}-\d{2}-\d{2}$/, "Must be YYYY-MM-DD")
+      .describe("End date (inclusive), YYYY-MM-DD"),
+    fields: z
+      .enum(["summary", "full"])
+      .default("summary")
+      .describe(
+        'Field set to return. ' +
+        '"summary" (default): id, name, type, start_date_local, moving_time, distance, ' +
+        'icu_training_load, StrydLBSSmod, total_elevation_gain — compact for screening. ' +
+        '"full": all fields except internal large objects (laps, streams, etc).'
+      ),
+    type: z
+      .string()
+      .optional()
+      .describe('Filter by activity type, e.g. "Run", "VirtualRun", "Ride". Case-sensitive, exact match.'),
+  },
+  handler: async ({ oldest, newest, fields, type }: {
+    oldest: string;
+    newest: string;
+    fields: "summary" | "full";
+    type?: string;
+  }, ctx?: ToolContext) => {
+    const raw = await intervalsClient.getActivities(oldest, newest, { signal: ctx?.signal });
+    let activities = raw as Activity[];
 
-      const raw = await intervalsClient.getActivities(oldest, newest);
-      let activities = raw as Activity[];
-
-      // Apply type filter (client-side — Intervals.icu API has no server-side filter)
-      if (type) {
-        activities = activities.filter((a) => a.type === type);
-      }
-
-      // Apply field projection
-      const projected = fieldSet === "summary"
-        ? activities.map(toSummary)
-        : activities.map(stripLargeFields);
-
-      return {
-        content: [
-          {
-            type: "text",
-            text: JSON.stringify(projected, null, 2),
-          },
-        ],
-      };
+    // Apply type filter (client-side — Intervals.icu API has no server-side filter)
+    if (type) {
+      activities = activities.filter((a) => a.type === type);
     }
-  );
-}
+
+    // Apply field projection — return raw data; adapters wrap it.
+    const projected = fields === "summary"
+      ? activities.map(toSummary)
+      : activities.map(stripLargeFields);
+
+    return projected;
+  },
+};

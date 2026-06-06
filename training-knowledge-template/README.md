@@ -1,7 +1,7 @@
 # Training Knowledge Template
 
 This MCP server provides Intervals.icu data and deterministic computations
-(PMC, cardiac decoupling, derived nutrition fields, etc.). **It does not interpret
+(PMC, cardiac decoupling, HRV trends, etc.). **It does not interpret
 your training.** Interpretation is done by your AI client (Claude Desktop, Codex,
 etc.) reading a "knowledge" file that you write yourself.
 

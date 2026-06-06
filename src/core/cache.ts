@@ -16,18 +16,20 @@ import { join, resolve, dirname } from "node:path";
 import { config_ } from "../config.js";
 import type { ActivityStreamRaw } from "./types.js";
 
-// Process-global runtime switch, initialized from config. In HTTP mode this is
+// Process-global runtime override for the cache switch. `null` means "fall back
+// to the configured CACHE_ENABLED default", read lazily on first use so that
+// importing this module needs no valid env (see config.ts). In HTTP mode this is
 // shared across all sessions; restarting the server resets it to the env default.
-let cacheEnabled = config_.cacheEnabled;
+let cacheEnabledOverride: boolean | null = null;
 
 /** Whether the stream cache is currently active. */
 export function isCacheEnabled(): boolean {
-  return cacheEnabled;
+  return cacheEnabledOverride ?? config_.cacheEnabled;
 }
 
 /** Enable or disable the stream cache at runtime (does not touch existing files). */
 export function setCacheEnabled(enabled: boolean): void {
-  cacheEnabled = enabled;
+  cacheEnabledOverride = enabled;
 }
 
 function cachePath(activityId: string): string {
@@ -39,7 +41,7 @@ function cachePath(activityId: string): string {
  * Returns null on cache miss or any read error.
  */
 export async function cacheGet(activityId: string): Promise<ActivityStreamRaw[] | null> {
-  if (!cacheEnabled) return null; // disabled → always a miss, fetch fresh
+  if (!isCacheEnabled()) return null; // disabled → always a miss, fetch fresh
   try {
     const raw = await readFile(cachePath(activityId), "utf-8");
     return JSON.parse(raw) as ActivityStreamRaw[];
@@ -53,7 +55,7 @@ export async function cacheGet(activityId: string): Promise<ActivityStreamRaw[] 
  * Failures are silently ignored (cache is best-effort).
  */
 export async function cacheSet(activityId: string, streams: ActivityStreamRaw[]): Promise<void> {
-  if (!cacheEnabled) return; // disabled → don't write
+  if (!isCacheEnabled()) return; // disabled → don't write
   try {
     await mkdir(config_.cacheDir, { recursive: true });
     await writeFile(cachePath(activityId), JSON.stringify(streams));

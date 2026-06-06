@@ -15,7 +15,7 @@
  */
 
 import { z } from "zod";
-import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
+import type { ToolDef, ToolContext } from "../../../tool-registry.js";
 import { intervalsClient } from "../../../core/intervals-client.js";
 import type { Activity, Wellness } from "../../../core/types.js";
 import { addDays } from "../../../utils/date.js";
@@ -47,41 +47,42 @@ function round(value: number | null, decimals: number): number | null {
   return Math.round(value * factor) / factor;
 }
 
-export function registerGetPhaseSummary(server: McpServer): void {
-  server.registerTool(
-    "get_phase_summary",
-    {
-      title: "Get Phase Summary",
-      description:
-        "Get a training phase summary with per-week breakdown and ramp rate analysis. " +
-        "Returns:\n" +
-        "- phase_totals: RSS, LBSS, total time (min), total distance (km), session count\n" +
-        "- weeks: per-week breakdown with totals, session count, averages (ILR, decoupling), PMC snapshot\n" +
-        "- trends: weekly RSS/LBSS series and CTL ramp rate (avg weekly CTL change)\n" +
-        "Note: start_date must be a Monday, end_date must be a Sunday. " +
-        "LBSS values require Stryd data synced to Intervals (post Nov 2025).",
-      inputSchema: {
-        start_date: z
-          .string()
-          .regex(/^\d{4}-\d{2}-\d{2}$/, "Must be YYYY-MM-DD")
-          .describe("Phase start date — Monday (YYYY-MM-DD)"),
-        end_date: z
-          .string()
-          .regex(/^\d{4}-\d{2}-\d{2}$/, "Must be YYYY-MM-DD")
-          .describe("Phase end date — Sunday (YYYY-MM-DD)"),
-        phase_name: z
-          .string()
-          .optional()
-          .describe("Optional phase name (included in response as-is, not used for filtering)"),
-      },
-    },
-    async ({ start_date: startDate, end_date: endDate, phase_name: phaseName }) => {
+export const getPhaseSummaryTool: ToolDef = {
+  name: "get_phase_summary",
+  title: "Get Phase Summary",
+  description:
+    "Get a training phase summary with per-week breakdown and ramp rate analysis. " +
+    "Returns:\n" +
+    "- phase_totals: RSS, LBSS, total time (min), total distance (km), session count\n" +
+    "- weeks: per-week breakdown with totals, session count, averages (ILR, decoupling), PMC snapshot\n" +
+    "- trends: weekly RSS/LBSS series and CTL ramp rate (avg weekly CTL change)\n" +
+    "Note: start_date must be a Monday, end_date must be a Sunday. " +
+    "LBSS values require Stryd data synced to Intervals (post Nov 2025).",
+  schema: {
+    start_date: z
+      .string()
+      .regex(/^\d{4}-\d{2}-\d{2}$/, "Must be YYYY-MM-DD")
+      .describe("Phase start date — Monday (YYYY-MM-DD)"),
+    end_date: z
+      .string()
+      .regex(/^\d{4}-\d{2}-\d{2}$/, "Must be YYYY-MM-DD")
+      .describe("Phase end date — Sunday (YYYY-MM-DD)"),
+    phase_name: z
+      .string()
+      .optional()
+      .describe("Optional phase name (included in response as-is, not used for filtering)"),
+  },
+  handler: async ({ start_date: startDate, end_date: endDate, phase_name: phaseName }: {
+    start_date: string;
+    end_date: string;
+    phase_name?: string;
+  }, ctx?: ToolContext) => {
       const warmupStart = addDays(startDate, -WARMUP_DAYS);
 
       // API 呼び出しは2回のみ（並列）
       const [rawActivities, rawWellness] = await Promise.all([
-        intervalsClient.getActivities(warmupStart, endDate),
-        intervalsClient.getWellness(startDate, endDate),
+        intervalsClient.getActivities(warmupStart, endDate, { signal: ctx?.signal }),
+        intervalsClient.getWellness(startDate, endDate, { signal: ctx?.signal }),
       ]);
 
       const allActivities = rawActivities as Activity[];
@@ -245,14 +246,6 @@ export function registerGetPhaseSummary(server: McpServer): void {
         },
       };
 
-      return {
-        content: [
-          {
-            type: "text",
-            text: JSON.stringify(result, null, 2),
-          },
-        ],
-      };
-    },
-  );
-}
+    return result;
+  },
+};

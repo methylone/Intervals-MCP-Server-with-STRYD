@@ -21,6 +21,10 @@ reach the port can call every tool with your Intervals.icu credentials.
 
 - Your Intervals.icu API key and athlete ID live **only in `.env`**, which is
   gitignored. Never commit them.
+- **MCPB install (Claude Desktop):** the API key is declared `sensitive` in the bundle
+  manifest, so Claude Desktop stores it in your **OS keychain** rather than a plaintext
+  config file. This only changes where the key is *stored* — the server's attack surface
+  (no app-layer auth on HTTP, etc.) is unchanged.
 - `.env.example` contains placeholders only — copy it to `.env` and fill in real
   values locally.
 - When pasting client config or asking an AI assistant to set things up, avoid

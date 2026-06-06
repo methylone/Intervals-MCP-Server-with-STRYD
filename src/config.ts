@@ -62,22 +62,59 @@ const envSchema = z.object({
     ),
 });
 
-const parsed = envSchema.safeParse(process.env);
-
-if (!parsed.success) {
-  const messages = parsed.error.issues
-    .map((e) => `  ${e.path.join(".")}: ${e.message}`)
-    .join("\n");
-  console.error(`[config] Environment variable validation failed:\n${messages}`);
-  process.exit(1);
+export interface AppConfig {
+  athleteId: string;
+  apiKey: string;
+  transport: "stdio" | "http";
+  port: number;
+  cacheDir: string;
+  cacheEnabled: boolean;
+  timezone: string;
 }
 
-export const config_ = {
-  athleteId: parsed.data.INTERVALS_ATHLETE_ID,
-  apiKey: parsed.data.INTERVALS_API_KEY,
-  transport: parsed.data.MCP_TRANSPORT,
-  port: parseInt(parsed.data.MCP_PORT, 10),
-  cacheDir: parsed.data.CACHE_DIR ?? defaultCacheDir(),
-  cacheEnabled: parsed.data.CACHE_ENABLED === "true",
-  timezone: parsed.data.ATHLETE_TIMEZONE,
-} as const;
+let cached: AppConfig | null = null;
+
+/**
+ * Validate process.env against envSchema and build the config (memoized).
+ * Throws an Error with a human-readable summary if validation fails — it does
+ * NOT exit the process (the error model leaves termination to the caller).
+ *
+ * Validation is deliberately lazy: importing this module — and therefore the
+ * tool registry that the CLI loads — must not require valid credentials, so
+ * `cli --help` / `cli list` / tool descriptions work with an absent or
+ * unconfigured .env. Credentials are only needed when a tool actually runs or
+ * when the MCP server boots (see index.ts, which calls loadConfig() up front).
+ */
+export function loadConfig(): AppConfig {
+  if (cached) return cached;
+
+  const parsed = envSchema.safeParse(process.env);
+  if (!parsed.success) {
+    const messages = parsed.error.issues
+      .map((e) => `  ${e.path.join(".")}: ${e.message}`)
+      .join("\n");
+    throw new Error(`Environment variable validation failed:\n${messages}`);
+  }
+
+  cached = {
+    athleteId: parsed.data.INTERVALS_ATHLETE_ID,
+    apiKey: parsed.data.INTERVALS_API_KEY,
+    transport: parsed.data.MCP_TRANSPORT,
+    port: parseInt(parsed.data.MCP_PORT, 10),
+    cacheDir: parsed.data.CACHE_DIR ?? defaultCacheDir(),
+    cacheEnabled: parsed.data.CACHE_ENABLED === "true",
+    timezone: parsed.data.ATHLETE_TIMEZONE,
+  };
+  return cached;
+}
+
+/**
+ * Lazily-validated config accessor. Reading any property triggers loadConfig()
+ * on first access; merely importing this module does not. Keeps every existing
+ * `config_.apiKey` / `config_.timezone` call site unchanged.
+ */
+export const config_: AppConfig = new Proxy({} as AppConfig, {
+  get(_target, prop) {
+    return loadConfig()[prop as keyof AppConfig];
+  },
+});

@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 import { z } from "zod";
-import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { intervalsClient } from "../intervals-client.js";
+import type { ToolDef, ToolContext } from "../../tool-registry.js";
 
 const eventSchema = z.object({
   name: z.string().describe("Event name (e.g., 'Easy 60min', 'SSR Long Run 32km')"),
@@ -25,49 +25,39 @@ const eventSchema = z.object({
   moving_time: z.number().optional().describe("Planned duration in seconds"),
 });
 
-export function registerCreateEvents(server: McpServer): void {
-  server.registerTool(
-    "create_events",
-    {
-      title: "Create Events",
-      description:
-        "Create one or more calendar events (planned workouts, races, notes) on Intervals.icu. " +
-        "Accepts a single event or an array for batch creation (e.g., a full week of planned training). " +
-        "Returns the created event(s) with their assigned IDs.",
-      inputSchema: {
-        events: z
-          .array(eventSchema)
-          .min(1)
-          .max(14)
-          .describe("Array of events to create (1–14). Use for batch loading a week or two of planned training."),
-      },
-    },
-    async ({ events }) => {
-      const results = [];
-      const errors = [];
-      for (const event of events) {
-        try {
-          // API requires datetime format — auto-append T00:00:00 for date-only input
-          const input = {
-            ...event,
-            start_date_local: event.start_date_local.includes("T")
-              ? event.start_date_local
-              : `${event.start_date_local}T00:00:00`,
-          };
-          const created = await intervalsClient.createEvent(input);
-          results.push(created);
-        } catch (e) {
-          errors.push({ event: event.name, date: event.start_date_local, error: String(e) });
-        }
+export const createEventsTool: ToolDef = {
+  name: "create_events",
+  title: "Create Events",
+  description:
+    "Create one or more calendar events (planned workouts, races, notes) on Intervals.icu. " +
+    "Accepts a single event or an array for batch creation (e.g., a full week of planned training). " +
+    "Returns the created event(s) with their assigned IDs.",
+  schema: {
+    events: z
+      .array(eventSchema)
+      .min(1)
+      .max(14)
+      .describe("Array of events to create (1–14). Use for batch loading a week or two of planned training."),
+  },
+  // Partial failure is returned as success data ({ created, errors }) — not thrown.
+  handler: async ({ events }: { events: z.infer<typeof eventSchema>[] }, ctx?: ToolContext) => {
+    const results = [];
+    const errors = [];
+    for (const event of events) {
+      try {
+        // API requires datetime format — auto-append T00:00:00 for date-only input
+        const input = {
+          ...event,
+          start_date_local: event.start_date_local.includes("T")
+            ? event.start_date_local
+            : `${event.start_date_local}T00:00:00`,
+        };
+        const created = await intervalsClient.createEvent(input, { signal: ctx?.signal });
+        results.push(created);
+      } catch (e) {
+        errors.push({ event: event.name, date: event.start_date_local, error: String(e) });
       }
-      return {
-        content: [
-          {
-            type: "text",
-            text: JSON.stringify({ created: results, errors }, null, 2),
-          },
-        ],
-      };
     }
-  );
-}
+    return { created: results, errors };
+  },
+};

@@ -13,14 +13,22 @@ See [ARCHITECTURE.md](ARCHITECTURE.md) for the full design; the essentials:
 - `src/utils/` — pure, deterministic, unit-tested helpers (no I/O).
 - `src/config.ts` — Zod-validated environment variables (`config_`).
 - `src/instructions.ts` — `buildServerInstructions(timeZone)` text for AI clients.
-- `src/index.ts` — composition root: builds the server, registers tools, picks the transport.
+- `src/tool-registry.ts` — `ToolDef` type + `TOOLS` array (transport-free source of truth).
+- `src/adapters/` — thin per-surface adapters (`mcp.ts` `registerToolDef`, `cli.ts` `runToolDef`).
+- `src/index.ts` — MCP composition root: registers `TOOLS` via `registerToolDef`, picks the transport.
+- `src/cli.ts` — CLI composition root: dispatches `TOOLS` via `runToolDef` (independent of `index.ts`).
 
 ## Project conventions
 
 - **No `console.log`.** It corrupts the stdio transport. Use `console.error` for
   diagnostics (kept consistent across stdio and HTTP modes).
-- **Errors are returned as MCP error responses; don't crash the process.**
-- **Tools follow `registerXxx(server)`** in one file each, registered in `index.ts`.
+- **Error model:** handlers return raw data on success and `throw` on hard failure;
+  don't crash the process. Adapters do the shaping — MCP turns a throw into an
+  `isError` response, the CLI prints to stderr and exits non-zero. Soft/partial
+  failure is returned as success data (e.g. `{ errors }`), not thrown.
+- **Tools are `export const xxxTool: ToolDef`** (one file each), collected in
+  `TOOLS` in `src/tool-registry.ts`. Defaults/validation run in the adapters'
+  `z.object(schema).parseAsync`, not in the handler.
 - **One-way imports:** `core/` and `utils/` must not import from `extensions/`.
 - **Dates are `YYYY-MM-DD` strings.** Civil-date arithmetic is timezone-independent;
   the configured `ATHLETE_TIMEZONE` is used only for instant→date conversions
@@ -48,9 +56,11 @@ be covered by unit tests. Run `npm test` before proposing changes.
 
 ## When adding features
 
-- New core tool → add `src/core/tools/<name>.ts` exporting `register<Name>`, then
-  import + call it in `index.ts`.
+- New core tool → add `src/core/tools/<name>.ts` exporting `export const <name>Tool:
+  ToolDef`, then add it to `TOOLS` in `src/tool-registry.ts` (both MCP and CLI pick
+  it up — no edit to `index.ts` or `cli.ts`).
 - New extension → add `src/extensions/<name>/` (own types + pure calculators +
-  `tools/`), importing only from `core/`/`utils/`. Register its tools in `index.ts`.
+  `tools/`), importing only from `core/`/`utils/`. Add its tools to `TOOLS` in
+  `src/tool-registry.ts`.
 - Keep deterministic math in pure functions and unit-test it; hand the LLM finished
   numbers to interpret.

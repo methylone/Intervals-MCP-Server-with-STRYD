@@ -1,17 +1,50 @@
 {
-  "name": "intervals-mcp-server",
-  "version": "0.1.0",
-  "description": "Intervals.icu MCP Server for running training management",
+  "name": "intervals-mcp-with-stryd",
+  "version": "0.3.0",
+  "description": "An Intervals.icu MCP server built for Stryd runners — power-based running analysis (a dual PMC with RSS and LBSS), designed so the LLM never does the math.",
   "license": "AGPL-3.0-or-later",
   "type": "module",
   "main": "build/index.js",
+  "bin": {
+    "intervals-mcp-with-stryd": "build/index.js",
+    "intervals-mcp": "build/cli.js"
+  },
+  "files": [
+    "build",
+    "manifest.json",
+    "README.md",
+    "README.ja.md",
+    "LICENSE"
+  ],
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/methylone/Intervals-MCP-Server-with-STRYD.git"
+  },
+  "homepage": "https://github.com/methylone/Intervals-MCP-Server-with-STRYD#readme",
+  "bugs": {
+    "url": "https://github.com/methylone/Intervals-MCP-Server-with-STRYD/issues"
+  },
+  "keywords": [
+    "mcp",
+    "model-context-protocol",
+    "intervals-icu",
+    "stryd",
+    "running",
+    "training-load",
+    "lbss",
+    "ultramarathon"
+  ],
   "scripts": {
     "build": "tsc",
     "dev": "tsx --env-file .env src/index.ts",
     "clean": "rm -rf build",
     "start": "node --env-file .env build/index.js",
     "test": "INTERVALS_ATHLETE_ID=i12345678 INTERVALS_API_KEY=dummy-key-for-tests node --env-file-if-exists=.env node_modules/vitest/vitest.mjs run",
-    "start:http": "MCP_TRANSPORT=http node --env-file .env build/index.js"
+    "start:http": "MCP_TRANSPORT=http node --env-file .env build/index.js",
+    "cli": "node --env-file-if-exists=.env build/cli.js",
+    "cli:dev": "tsx --env-file .env src/cli.ts",
+    "docker:up": "BUILD_SHA=\"$(git rev-parse --short HEAD)$(git diff --quiet || echo -dirty)\" docker compose up -d --build --force-recreate intervals-mcp",
+    "prepublishOnly": "npm run clean && npm run build && npm test"
   },
   "engines": {
     "node": ">=20.12.0"

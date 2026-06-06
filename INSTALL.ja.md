@@ -25,11 +25,59 @@ AI アシスタントに渡してセットアップを代行させることも�
   Intervals.icu の Open-Meteo エンリッチメントに由来します。温度フィルタを設定すると、天候データの
   ないアクティビティは除外されます。
 
-## セットアップ
+## MCPB でインストール（Claude Desktop・最も簡単）
+
+Claude Desktop は単一の `.mcpb` バンドルからこのサーバをインストールできます——clone も
+Node のセットアップも不要です。[最新リリース](https://github.com/methylone/Intervals-MCP-Server-with-STRYD/releases)
+から `intervals-mcp-with-stryd.mcpb` をダウンロードしてダブルクリックすると、Claude Desktop が
+3 項目の入力を求めます:
+
+- **Athlete ID** — `i…`（または `0`、API キー所有者）。
+- **API キー** — Intervals.icu の *Settings → Developer* から。sensitive 扱いで、平文ファイル
+  ではなく **OS キーチェーン**に保管されます。
+- **タイムゾーン** — IANA 名（任意・デフォルト `UTC`）。
+
+**Stryd** ツールがデータを返すには、下記
+[Stryd カスタムフィールドの設定](#stryd-カスタムフィールドの設定任意)が引き続き必要です。
+サーバのインストール自体はこれ以外に何も要りません。
+
+## npx でインストール
+
+クライアントが MCP サーバをコマンドで起動する方式（Claude Desktop, Codex など）なら、公開
+npm パッケージを直接実行できます——clone もビルドも不要:
+
+```json
+{
+  "mcpServers": {
+    "intervals": {
+      "command": "npx",
+      "args": ["-y", "intervals-mcp-with-stryd"],
+      "env": {
+        "INTERVALS_ATHLETE_ID": "i0000000",
+        "INTERVALS_API_KEY": "your-api-key",
+        "ATHLETE_TIMEZONE": "Asia/Tokyo",
+        "CACHE_DIR": "/absolute/path/to/intervals-cache"
+      }
+    }
+  }
+}
+```
+
+`CACHE_DIR` は任意ですが、ここでは推奨です。ディスク上のストリームキャッシュはサーバの
+インストール位置配下に解決されますが、`npx` ではそれが **揮発的な npx パッケージキャッシュ**に
+なるため、実行をまたいでキャッシュを残したい場合は安定した絶対パスを `CACHE_DIR` に指定して
+ください。（キャッシュ対象はアクティビティの *ストリーム* のみ。PMC / ウェルネス / アクティビティ
+は常に新規取得です。）npm パッケージは `intervals-mcp` CLI も `PATH` に導入します——
+[docs/CLI.md](docs/CLI.md) を参照。
+
+Stryd 拡張には、下記
+[Stryd カスタムフィールドの設定](#stryd-カスタムフィールドの設定任意)を追加してください。
+
+## ソースからインストール（開発 / HTTP / Docker）
 
 ```bash
 # 1. Clone
-git clone <this-repository-url> intervals-mcp-server
+git clone https://github.com/methylone/Intervals-MCP-Server-with-STRYD.git intervals-mcp-server
 cd intervals-mcp-server
 
 # 2. Install dependencies

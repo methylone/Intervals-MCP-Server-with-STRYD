@@ -8,12 +8,12 @@
  * - LBSS 系: StrydLBSSmod から WARMUP_DAYS の助走期間を含めて EMA 計算
  */
 
-import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { config_ } from "../../../config.js";
 import { intervalsClient } from "../../../core/intervals-client.js";
 import type { Activity, Wellness } from "../../../core/types.js";
 import { today, addDays } from "../../../utils/date.js";
 import { computeLbssPmc } from "../lbss-calculator.js";
+import type { ToolDef, ToolContext } from "../../../tool-registry.js";
 
 /**
  * EMA の精度確保のための助走期間（日数）。
@@ -21,27 +21,24 @@ import { computeLbssPmc } from "../lbss-calculator.js";
  */
 const WARMUP_DAYS = 180;
 
-export function registerGetCurrentPmc(server: McpServer): void {
-  server.registerTool(
-    "get_current_pmc",
-    {
-      title: "Get Current PMC",
-      description:
-        "Get today's Performance Management Chart (PMC) values. " +
-        "Returns CTL, ATL, and TSB for two load metrics:\n" +
-        "- rss: RSS-based (from Intervals.icu wellness data, pre-calculated)\n" +
-        "- lbss: LBSS-based (calculated from Stryd StrydLBSSmod over the past 180 days)\n" +
-        "Note: lbss values are 0 if no Stryd data is available in the period.",
-      inputSchema: {},
-    },
-    async () => {
-      const endDate = today(config_.timezone);
+export const getCurrentPmcTool: ToolDef = {
+  name: "get_current_pmc",
+  title: "Get Current PMC",
+  description:
+    "Get today's Performance Management Chart (PMC) values. " +
+    "Returns CTL, ATL, and TSB for two load metrics:\n" +
+    "- rss: RSS-based (from Intervals.icu wellness data, pre-calculated)\n" +
+    "- lbss: LBSS-based (calculated from Stryd StrydLBSSmod over the past 180 days)\n" +
+    "Note: lbss values are 0 if no Stryd data is available in the period.",
+  schema: {},
+  handler: async (_args: {}, ctx?: ToolContext) => {
+    const endDate = today(config_.timezone);
       const startDate = addDays(endDate, -WARMUP_DAYS);
 
       // wellness と activities を並列取得
       const [rawWellness, rawActivities] = await Promise.all([
-        intervalsClient.getWellness(startDate, endDate),
-        intervalsClient.getActivities(startDate, endDate),
+        intervalsClient.getWellness(startDate, endDate, { signal: ctx?.signal }),
+        intervalsClient.getActivities(startDate, endDate, { signal: ctx?.signal }),
       ]);
 
       const wellness = rawWellness as Wellness[];
@@ -70,14 +67,6 @@ export function registerGetCurrentPmc(server: McpServer): void {
         tsb: Math.round((lbssToday?.tsb ?? 0) * 10) / 10,
       };
 
-      return {
-        content: [
-          {
-            type: "text",
-            text: JSON.stringify({ date: endDate, rss, lbss }, null, 2),
-          },
-        ],
-      };
-    },
-  );
-}
+    return { date: endDate, rss, lbss };
+  },
+};

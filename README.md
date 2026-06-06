@@ -1,67 +1,104 @@
 English | [日本語](README.ja.md)
 
-# Intervals.icu MCP Server
+# Intervals.icu MCP Server — for Stryd runners
 
-A Model Context Protocol (MCP) server that gives an AI client (Claude Desktop,
-Codex, etc.) structured access to your [Intervals.icu](https://intervals.icu)
-training data — plus deterministic, server-side computations that the AI should
-not be guessing at (Performance Management Chart values, cardiac decoupling,
-derived nutrition fields, and more).
+An [Intervals.icu](https://intervals.icu) MCP (Model Context Protocol) server built
+for **Stryd runners** — power-based running analysis (a dual Performance Management
+Chart with RSS, LBSS), designed so the LLM never does the
+math. The deterministic numbers (PMC values, cardiac decoupling, ramp rates) are
+computed server-side; the AI client (Claude Desktop, Codex, …) is left to interpret,
+not to guess.
 
-It is designed to run **locally, for a single athlete (you)**. It is not a hosted,
+It is designed to run **locally, for a single athlete (you)** — not as a hosted,
 multi-user service.
 
 ## What it does
 
-- **Core (any Intervals.icu user):** list and inspect activities, wellness data,
-  events / planned workouts (read + create / update / delete), athlete summaries,
-  and stream-level analysis (splits, cardiac decoupling, pacing).
-- **Stryd extension (power-meter users):** a second Performance Management Chart
-  computed server-side from a lower-body load metric (LBSS) via EMA, alongside
-  Intervals.icu's built-in RSS-based PMC; weekly and phase-level load trends.
+- **Stryd extension (the reason this exists).** A second Performance Management Chart
+  computed server-side from a lower-body load metric — **LBSS** (Lower Body Stress
+  Score) — via EMA, sitting next to Intervals.icu's built-in RSS-based PMC. You get a
+  **dual PMC** (musculoskeletal load *and* metabolic load), ILR (Impact Loading Rate)
+  trends, and weekly / phase-level summaries aimed at ultramarathon-style review.
+- **Core (any Intervals.icu user).** List and inspect activities, wellness, HRV
+  trends, events / planned workouts (read + create / update / delete), athlete
+  summaries, and stream-level analysis (splits, cardiac decoupling, grade-adjusted
+  pace, custom power/HR zones).
 
-The server only provides **data and math**. It does **not** decide how you should
-train — that interpretation comes from a knowledge file *you* write and load into
-your AI client. See [`training-knowledge-template/`](training-knowledge-template/).
+The server provides **data and math only**. It does **not** decide how you should
+train — that interpretation comes from a knowledge file *you* write and load into your
+AI client. See [`training-knowledge-template/`](training-knowledge-template/).
 
 ## Quick start
 
-Requirements: Node.js ≥ 20.12, an Intervals.icu account and API key. The Stryd
-extension additionally needs a Stryd power meter and the relevant Intervals.icu
-custom fields. Full steps: [INSTALL.md](INSTALL.md).
+Pick the install path that matches your client. Full steps and prerequisites:
+[INSTALL.md](INSTALL.md).
+
+### 1. MCPB bundle — Claude Desktop (easiest)
+
+Download the `.mcpb` bundle from the
+[latest release](https://github.com/methylone/Intervals-MCP-Server-with-STRYD/releases),
+double-click to install into Claude Desktop, and fill in the three fields it asks for
+(Athlete ID, API key, timezone). Your API key is stored in the **OS keychain**, not in
+a plaintext file.
+
+### 2. npx — one-line config (Claude Desktop / Codex / any MCP client)
+
+No clone, no build. Point your client at the published npm package:
+
+```json
+{
+  "mcpServers": {
+    "intervals": {
+      "command": "npx",
+      "args": ["-y", "intervals-mcp-with-stryd"],
+      "env": {
+        "INTERVALS_ATHLETE_ID": "i0000000",
+        "INTERVALS_API_KEY": "your-api-key",
+        "ATHLETE_TIMEZONE": "Asia/Tokyo",
+        "CACHE_DIR": "/absolute/path/to/intervals-cache"
+      }
+    }
+  }
+}
+```
+
+`CACHE_DIR` is optional but recommended under npx: without it the stream cache lands in
+npx's volatile package cache. See [INSTALL.md](INSTALL.md#install-via-npx).
+
+### 3. From source / Docker (development, HTTP mode)
 
 ```bash
-git clone <repo-url>
-cd intervals-mcp-server
+git clone https://github.com/methylone/Intervals-MCP-Server-with-STRYD.git
+cd Intervals-MCP-Server-with-STRYD
 npm install
 cp .env.example .env      # then fill in your API key, athlete ID, timezone
 npm run build
 ```
 
-Then point Claude Desktop (or Codex) at `build/index.js` over stdio — see
-[INSTALL.md](INSTALL.md) for the exact config block. New to this? Hand the repo URL
-to your AI client and ask it to walk you through installation using the README and
-INSTALL.md.
+Then point your client at `build/index.js` over stdio, or run HTTP / Docker — see
+[INSTALL.md](INSTALL.md). New to this? Hand the repo URL to your AI client and ask it to
+walk you through installation using the README and INSTALL.md.
+
+## Command-line use
+
+The same tools are also available from a shell via the `intervals-mcp` CLI (no MCP
+client, no LLM) — useful for automation, piping into `jq`, and quick checks. It returns
+raw data only; it does **not** apply the methodology. See [docs/CLI.md](docs/CLI.md).
 
 ## Documentation
 
-- [INSTALL.md](INSTALL.md) — prerequisites and client setup
+- [INSTALL.md](INSTALL.md) — prerequisites and client setup (MCPB / npx / source)
+- [docs/CLI.md](docs/CLI.md) — running the tools from a shell
 - [ARCHITECTURE.md](ARCHITECTURE.md) — code layout and how to extend it
 - [SECURITY.md](SECURITY.md) — **read before using HTTP mode**
 - [ROADMAP.md](ROADMAP.md) — what's planned next
 - [`training-knowledge-template/`](training-knowledge-template/) — build your own
   analysis knowledge for your AI client
 
-## Roadmap
-
-Planned next, in order: **(1)** a simple CLI front-end so the tools can be run from a
-shell as well as over MCP, then **(2)** decoupling the tool definitions from the MCP
-transport so the same tools can back multiple front-ends. See [ROADMAP.md](ROADMAP.md).
-
 ## Security
 
-The HTTP transport has **no application-layer authentication**. Run the server
-locally over stdio for personal use, and never expose HTTP mode to the public
+The HTTP transport has **no application-layer authentication**. Run the server locally
+over stdio (or MCPB / npx) for personal use, and never expose HTTP mode to the public
 internet. See [SECURITY.md](SECURITY.md).
 
 ## Contributing
@@ -72,6 +109,6 @@ maintained, so please fork freely rather than expecting timely reviews.
 ## License
 
 [AGPL-3.0-or-later](LICENSE). In short: you're free to use, modify, and run this,
-including commercially — but if you distribute it or run a modified version as a
-network service, you must release your source under the same license. It cannot be
-turned into a closed, proprietary product.
+including commercially — but if you distribute it or run a modified version as a network
+service, you must release your source under the same license. It cannot be turned into a
+closed, proprietary product.

@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 import { z } from "zod";
-import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { intervalsClient } from "../intervals-client.js";
+import type { ToolDef, ToolContext } from "../../tool-registry.js";
 import {
   streamsToMap,
   buildValidMask,
@@ -67,16 +67,14 @@ function customSplitLabel(breakpoints: number[], idx: number): string {
   return `${startKm}-${endKm}km`;
 }
 
-export function registerGetStreamsSummary(server: McpServer): void {
-  server.registerTool(
-    "get_activity_streams_summary",
-    {
-      title: "Get Activity Streams Summary",
-      description:
-        "Fetch activity stream data, clean/split/aggregate, and return a summary with splits, " +
-        "cardiac decoupling, and efficiency metrics.",
-      inputSchema: {
-        activity_id: z
+export const getStreamsSummaryTool: ToolDef = {
+  name: "get_activity_streams_summary",
+  title: "Get Activity Streams Summary",
+  description:
+    "Fetch activity stream data, clean/split/aggregate, and return a summary with splits, " +
+    "cardiac decoupling, and efficiency metrics.",
+  schema: {
+    activity_id: z
           .string()
           .min(1)
           .refine(
@@ -138,19 +136,27 @@ export function registerGetStreamsSummary(server: McpServer): void {
             "Example: [131, 139, 146, 155] creates 5 zones: <131, 131-139, 139-146, 146-155, >155. " +
             "If omitted, custom HR zone analysis is skipped."
           ),
-      },
-    },
-    async ({ activity_id, split_method, split_breakpoints_m, segment_count, warmup_exclude_sec, post_stop_buffer_sec, power_zone_boundaries, hr_zone_boundaries }) => {
-      // Zod defaults may not apply via MCP transport, so apply fallbacks explicitly
-      const warmupExcludeSec = warmup_exclude_sec ?? 600;
-      const postStopBufferSec = post_stop_buffer_sec ?? 30;
-      const splitMethodParam = split_method ?? "auto";
+  },
+  handler: async ({ activity_id, split_method, split_breakpoints_m, segment_count, warmup_exclude_sec, post_stop_buffer_sec, power_zone_boundaries, hr_zone_boundaries }: {
+      activity_id: string;
+      split_method: "auto" | "halves" | "thirds" | "quarters" | "km" | "custom" | "segments";
+      split_breakpoints_m?: number[];
+      segment_count?: number;
+      warmup_exclude_sec: number;
+      post_stop_buffer_sec: number;
+      power_zone_boundaries?: number[];
+      hr_zone_boundaries?: number[];
+    }, ctx?: ToolContext) => {
+      // Defaults applied by the adapter's parseAsync (warmup=600, post_stop=30, split_method="auto").
+      const warmupExcludeSec = warmup_exclude_sec;
+      const postStopBufferSec = post_stop_buffer_sec;
+      const splitMethodParam = split_method;
       const splitBreakpointsM = split_breakpoints_m;
 
       // Stage 1: Fetch streams and activity name in parallel
       const [streams, activityRaw] = await Promise.all([
-        intervalsClient.getActivityStreams(activity_id, [...STREAMS_SUMMARY_TYPES]),
-        intervalsClient.getActivityDetail(activity_id),
+        intervalsClient.getActivityStreams(activity_id, [...STREAMS_SUMMARY_TYPES], { signal: ctx?.signal }),
+        intervalsClient.getActivityDetail(activity_id, { signal: ctx?.signal }),
       ]);
 
       const activity = activityRaw as { name?: string; has_weather?: boolean };
@@ -419,14 +425,6 @@ export function registerGetStreamsSummary(server: McpServer): void {
         },
       };
 
-      return {
-        content: [
-          {
-            type: "text",
-            text: JSON.stringify(result, null, 2),
-          },
-        ],
-      };
-    }
-  );
-}
+    return result;
+  },
+};

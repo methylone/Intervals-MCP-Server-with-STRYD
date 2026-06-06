@@ -1,0 +1,37 @@
+# Files excluded from the .mcpb bundle.
+# The bundle ships: manifest.json + build/ + node_modules/ (prod only) +
+# package.json + LICENSE + README.md. Everything else is dev/source/infra.
+
+# TypeScript sources & tests (the bundle ships compiled build/ only)
+src/
+__tests__/
+tsconfig.json
+
+# Docs & guidance dirs — keep only the top-level README.md in the bundle
+docs/
+training-knowledge-template/
+*.md
+!/README.md
+
+# Infra / containers / CI
+Dockerfile
+.dockerignore
+docker-compose.yml
+.github/
+
+# Secrets & local env (defense in depth; these are also gitignored)
+.env
+.env.*
+cache/
+
+# Repo / sync / OS cruft
+.git/
+.gitignore
+.stfolder/
+.DS_Store
+
+# Internal curation list (never public)
+PUBLIC_MANIFEST.md
+
+# Never nest a bundle inside the bundle
+*.mcpb

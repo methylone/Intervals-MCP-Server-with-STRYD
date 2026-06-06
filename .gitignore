@@ -2,14 +2,19 @@
 .env
 .env.*
 !.env.example
+intervals_api_keys.txt
 
 # Build output / deps / cache
 build/
 node_modules/
 cache/
 
+# MCPB bundle artifact (distributed as a GitHub Release asset, never committed)
+*.mcpb
+
 # OS / editor cruft
 .DS_Store
+.stfolder/
 
 # Temporary verification scripts
 tmp_*.ts
