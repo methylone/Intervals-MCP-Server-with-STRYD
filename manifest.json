@@ -2,7 +2,7 @@
   "manifest_version": "0.3",
   "name": "intervals-mcp-with-stryd",
   "display_name": "Intervals MCP with STRYD",
-  "version": "0.5.0",
+  "version": "0.6.0",
   "description": "An Intervals.icu MCP server built for Stryd runners — power-based running analysis (a dual PMC with RSS and LBSS), designed so the LLM never does the math.",
   "author": {
     "name": "methylone"
@@ -38,6 +38,9 @@
         "ATHLETE_TIMEZONE": "${user_config.timezone}",
         "READ_ONLY": "${user_config.read_only}",
         "CACHE_ENABLED": "${user_config.cache_enabled}",
+        "LBSS_FIELD": "${user_config.lbss_field}",
+        "LBSS_FIELD_LEGACY": "${user_config.lbss_field_legacy}",
+        "ILR_FIELD": "${user_config.ilr_field}",
         "CACHE_DIR": "${HOME}/.intervals-mcp-with-stryd/cache/streams"
       }
     }
@@ -76,6 +79,27 @@
       "description": "Cache activity streams on disk for faster re-analysis. See https://github.com/methylone/Intervals-MCP-Server-with-STRYD/blob/main/SECURITY.md",
       "required": false,
       "default": true
+    },
+    "lbss_field": {
+      "type": "string",
+      "title": "LBSS custom-field code",
+      "description": "Intervals.icu custom-field code the LBSS PMC is built on (CamelCase, no underscore). Default StrydLBSSv2 (Stryd-faithful recalibration). If your account only has the community StrydLBSSmod field, build StrydLBSSv2 from the field recipes or set this to StrydLBSSmod. Recipes: https://github.com/methylone/Intervals-MCP-Server-with-STRYD/wiki/LLM-Agent-Recipes",
+      "required": false,
+      "default": "StrydLBSSv2"
+    },
+    "lbss_field_legacy": {
+      "type": "string",
+      "title": "Legacy LBSS custom-field code",
+      "description": "Legacy LBSS field reported side by side when a tool is called with include_legacy=true (for migration comparison). Default StrydLBSSmod.",
+      "required": false,
+      "default": "StrydLBSSmod"
+    },
+    "ilr_field": {
+      "type": "string",
+      "title": "ILR custom-field code",
+      "description": "Intervals.icu custom-field code for Impact Loading Rate (CamelCase, no underscore). Default StrydILR.",
+      "required": false,
+      "default": "StrydILR"
     }
   },
   "compatibility": {
@@ -96,7 +120,7 @@
     },
     {
       "name": "get_activity_detail",
-      "description": "Fetch complete data for a single Intervals.icu activity, including power/HR zone distributions (icu_zone_times, icu_hr_zone_times), Stryd metrics (StrydLBSSmod, StrydILR), decoupling, and all other fields."
+      "description": "Fetch complete data for a single Intervals.icu activity, including power/HR zone distributions (icu_zone_times, icu_hr_zone_times), Stryd metrics (the configured LBSS/ILR custom fields), decoupling, and all other fields."
     },
     {
       "name": "get_activity_streams_summary",

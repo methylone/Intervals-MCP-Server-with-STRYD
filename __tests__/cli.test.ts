@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
-import { describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import { main } from "../src/cli.js";
 
 function captureIo() {
@@ -95,5 +95,43 @@ describe("cli", () => {
     expect(code).toBe(1);
     expect(capture.stdout).toBe("");
     expect(capture.stderr).toContain("Tool not found: bogus_tool");
+  });
+});
+
+// §3.3 regression guard (v0.6.0): building the tool registry and listing it must
+// NOT trigger loadConfig — `cli list` has to work with NO credentials present,
+// even though get_activities now references config_.lbssField (lazily, inside its
+// handler). A fresh module graph with the creds stripped proves nothing reads
+// config_ at import/enumeration time.
+describe("cli list — credential-free", () => {
+  afterEach(() => {
+    vi.resetModules();
+  });
+
+  it("lists all 17 tools with no INTERVALS_* env set", async () => {
+    vi.resetModules();
+    const saved = { ...process.env };
+    try {
+      delete process.env.INTERVALS_API_KEY;
+      delete process.env.INTERVALS_ATHLETE_ID;
+      delete process.env.LBSS_FIELD;
+
+      const { main: freshMain } = await import("../src/cli.js");
+
+      let stdout = "";
+      let stderr = "";
+      const code = await freshMain(["list"], {
+        stdout: (t: string) => { stdout += t; },
+        stderr: (t: string) => { stderr += t; },
+      });
+
+      expect(code).toBe(0);
+      expect(stderr).toBe("");
+      const tools = JSON.parse(stdout) as Array<{ name: string }>;
+      expect(tools).toHaveLength(17);
+    } finally {
+      for (const k of Object.keys(process.env)) if (!(k in saved)) delete process.env[k];
+      Object.assign(process.env, saved);
+    }
   });
 });

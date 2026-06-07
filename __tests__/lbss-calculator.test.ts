@@ -6,9 +6,17 @@ import {
 } from "../src/extensions/stryd/lbss-calculator.js";
 import type { Activity } from "../src/core/types.js";
 
+// The LBSS field name is now a required parameter (configurable in production).
+// These wrappers pin it to StrydLBSSmod so the existing math assertions below
+// read unchanged; field-name behavior is covered by its own describe block.
+const FIELD = "StrydLBSSmod";
+const pmc = (a: ReadonlyArray<Activity>, s: string, e: string) =>
+  computeLbssPmc(a, s, e, FIELD);
+const pmcAt = (a: ReadonlyArray<Activity>, t: string) => getLbssPmcAt(a, t, FIELD);
+
 // ─── テスト用ファクトリ ──────────────────────────────────────────────────────
 
-function makeActivity(date: string, lbss?: number): Activity {
+function makeActivity(date: string, lbss?: number, field = FIELD): Activity {
   return {
     id: `act_${date}`,
     name: "Morning Run",
@@ -16,7 +24,7 @@ function makeActivity(date: string, lbss?: number): Activity {
     start_date_local: `${date}T10:00:00`,
     moving_time: 3600,
     distance: 10000,
-    ...(lbss !== undefined ? { StrydLBSSmod: lbss } : {}),
+    ...(lbss !== undefined ? { [field]: lbss } : {}),
   };
 }
 
@@ -24,14 +32,14 @@ function makeActivity(date: string, lbss?: number): Activity {
 
 describe("computeLbssPmc", () => {
   it("結果の長さが日付範囲に一致する", () => {
-    const result = computeLbssPmc([], "2024-01-01", "2024-01-05");
+    const result = pmc([], "2024-01-01", "2024-01-05");
     expect(result).toHaveLength(5);
     expect(result[0].date).toBe("2024-01-01");
     expect(result[4].date).toBe("2024-01-05");
   });
 
   it("アクティビティがない場合は CTL/ATL/TSB が全て 0", () => {
-    const result = computeLbssPmc([], "2024-01-01", "2024-01-03");
+    const result = pmc([], "2024-01-01", "2024-01-03");
     for (const entry of result) {
       expect(entry.ctl).toBe(0);
       expect(entry.atl).toBe(0);
@@ -42,7 +50,7 @@ describe("computeLbssPmc", () => {
   it("単一アクティビティの CTL/ATL/TSB を正確に計算する", () => {
     // LBSS=70, τ_atl=7 → ATL = 0*(6/7) + 70*(1/7) = 10
     // LBSS=70, τ_ctl=42 → CTL = 0*(41/42) + 70*(1/42) = 70/42 = 5/3
-    const result = computeLbssPmc(
+    const result = pmc(
       [makeActivity("2024-01-01", 70)],
       "2024-01-01",
       "2024-01-01",
@@ -59,7 +67,7 @@ describe("computeLbssPmc", () => {
       makeActivity("2024-01-03", 50),
       makeActivity("2024-01-05", 90),
     ];
-    const result = computeLbssPmc(activities, "2024-01-01", "2024-01-07");
+    const result = pmc(activities, "2024-01-01", "2024-01-07");
     for (const entry of result) {
       expect(entry.tsb).toBeCloseTo(entry.ctl - entry.atl);
     }
@@ -67,7 +75,7 @@ describe("computeLbssPmc", () => {
 
   it("アクティビティ翌日の ATL は decay だけ減衰する", () => {
     // Day1 ATL=10, Day2 (休息): ATL = 10*(6/7) = 60/7
-    const result = computeLbssPmc(
+    const result = pmc(
       [makeActivity("2024-01-01", 70)],
       "2024-01-01",
       "2024-01-02",
@@ -79,7 +87,7 @@ describe("computeLbssPmc", () => {
   it("CTL は ATL より緩やかに上昇・減衰する", () => {
     // τ_ctl=42 > τ_atl=7 → CTL の変化は ATL より小さい
     const activities = [makeActivity("2024-01-01", 70)];
-    const result = computeLbssPmc(activities, "2024-01-01", "2024-01-08");
+    const result = pmc(activities, "2024-01-01", "2024-01-08");
     const day1 = result[0];
     const day8 = result[7]; // 1週間後
     // 1週間後の ATL の減衰率 = (6/7)^7 ≈ 0.3493
@@ -93,7 +101,7 @@ describe("computeLbssPmc", () => {
       makeActivity("2024-01-01"),         // StrydLBSSmod なし
       makeActivity("2024-01-02"),         // StrydLBSSmod なし
     ];
-    const result = computeLbssPmc(activities, "2024-01-01", "2024-01-02");
+    const result = pmc(activities, "2024-01-01", "2024-01-02");
     for (const entry of result) {
       expect(entry.ctl).toBe(0);
       expect(entry.atl).toBe(0);
@@ -106,7 +114,7 @@ describe("computeLbssPmc", () => {
       makeActivity("2024-01-01", 30),
       makeActivity("2024-01-01", 40),
     ];
-    const result = computeLbssPmc(activities, "2024-01-01", "2024-01-01");
+    const result = pmc(activities, "2024-01-01", "2024-01-01");
     expect(result[0].atl).toBeCloseTo(10);
     // 合算せず順番に適用した場合 ATL ≠ 10（合算の必要性の確認）
     // emaStep(emaStep(0, 30, 7), 40, 7) = (30/7)*(6/7) + 40/7 ≠ 10
@@ -116,12 +124,12 @@ describe("computeLbssPmc", () => {
   });
 
   it("LBSS=0 のアクティビティは休息日と同じ扱いになる", () => {
-    const withZeroLbss = computeLbssPmc(
+    const withZeroLbss = pmc(
       [makeActivity("2024-01-01", 0)],
       "2024-01-01",
       "2024-01-01",
     );
-    const noActivity = computeLbssPmc([], "2024-01-01", "2024-01-01");
+    const noActivity = pmc([], "2024-01-01", "2024-01-01");
     expect(withZeroLbss[0].atl).toBeCloseTo(noActivity[0].atl);
   });
 
@@ -135,21 +143,21 @@ describe("computeLbssPmc", () => {
       makeActivity("2024-01-02", 70),
       makeActivity("2024-01-03", 70),
     ];
-    const result = computeLbssPmc(activities, "2024-01-01", "2024-01-03");
+    const result = pmc(activities, "2024-01-01", "2024-01-03");
     expect(result[0].atl).toBeCloseTo(10);
     expect(result[1].atl).toBeCloseTo(130 / 7);
     expect(result[2].atl).toBeCloseTo(1270 / 49);
   });
 
   it("日付が昇順で返される", () => {
-    const result = computeLbssPmc([], "2024-01-01", "2024-01-03");
+    const result = pmc([], "2024-01-01", "2024-01-03");
     expect(result[0].date).toBe("2024-01-01");
     expect(result[1].date).toBe("2024-01-02");
     expect(result[2].date).toBe("2024-01-03");
   });
 
   it("startDate == endDate のとき 1 件のみ返す", () => {
-    const result = computeLbssPmc(
+    const result = pmc(
       [makeActivity("2024-06-15", 100)],
       "2024-06-15",
       "2024-06-15",
@@ -159,24 +167,54 @@ describe("computeLbssPmc", () => {
   });
 });
 
+// ─── field パラメータ ────────────────────────────────────────────────────────
+
+describe("computeLbssPmc — field パラメータ", () => {
+  it("指定したフィールドだけを LBSS として読む", () => {
+    // 同一アクティビティに2つのフィールド。field 引数で拾う値が切り替わる。
+    const activity: Activity = {
+      ...makeActivity("2024-01-01"),
+      StrydLBSSmod: 70, // legacy → ATL=10
+      StrydLBSSv2: 35,  // v2 → ATL=5
+    };
+    const legacy = computeLbssPmc([activity], "2024-01-01", "2024-01-01", "StrydLBSSmod");
+    const v2 = computeLbssPmc([activity], "2024-01-01", "2024-01-01", "StrydLBSSv2");
+    expect(legacy[0].atl).toBeCloseTo(10);
+    expect(v2[0].atl).toBeCloseTo(5);
+    // 別フィールドなので値は一致しない（設定切替が実際に効くことの保証）
+    expect(legacy[0].atl).not.toBeCloseTo(v2[0].atl);
+  });
+
+  it("存在しないフィールド名を渡すと全アクティビティが無視される", () => {
+    const result = computeLbssPmc(
+      [makeActivity("2024-01-01", 70)],
+      "2024-01-01",
+      "2024-01-01",
+      "NoSuchField",
+    );
+    expect(result[0].atl).toBe(0);
+    expect(result[0].ctl).toBe(0);
+  });
+});
+
 // ─── getLbssPmcAt ────────────────────────────────────────────────────────────
 
 describe("getLbssPmcAt", () => {
   it("アクティビティがない場合は CTL=ATL=TSB=0 を返す", () => {
-    const result = getLbssPmcAt([], "2024-01-10");
+    const result = pmcAt([], "2024-01-10");
     expect(result).toEqual({ date: "2024-01-10", ctl: 0, atl: 0, tsb: 0 });
   });
 
   it("全アクティビティが targetDate より後の場合は 0 を返す", () => {
     const activities = [makeActivity("2024-02-01", 70)];
-    const result = getLbssPmcAt(activities, "2024-01-15");
+    const result = pmcAt(activities, "2024-01-15");
     expect(result).toEqual({ date: "2024-01-15", ctl: 0, atl: 0, tsb: 0 });
   });
 
   it("targetDate の PMC 値を返す", () => {
     // "2024-01-01" に LBSS=70 → "2024-01-01" の ATL = 10
     const activities = [makeActivity("2024-01-01", 70)];
-    const result = getLbssPmcAt(activities, "2024-01-01");
+    const result = pmcAt(activities, "2024-01-01");
     expect(result.date).toBe("2024-01-01");
     expect(result.atl).toBeCloseTo(10);
     expect(result.ctl).toBeCloseTo(70 / 42);
@@ -185,7 +223,7 @@ describe("getLbssPmcAt", () => {
   it("targetDate が最終アクティビティより後でも正しく計算する", () => {
     // Day1: ATL=10, Day5 (何もなし): ATL = 10 * (6/7)^4
     const activities = [makeActivity("2024-01-01", 70)];
-    const result = getLbssPmcAt(activities, "2024-01-05");
+    const result = pmcAt(activities, "2024-01-05");
     expect(result.date).toBe("2024-01-05");
     expect(result.atl).toBeCloseTo(10 * (6 / 7) ** 4);
   });
@@ -197,9 +235,9 @@ describe("getLbssPmcAt", () => {
       makeActivity("2024-01-01", 70), // 最古（順序が後でも）
       makeActivity("2024-01-02", 70),
     ];
-    const result = getLbssPmcAt(activities, "2024-01-03");
+    const result = pmcAt(activities, "2024-01-03");
     // 3日分の蓄積があるはず
-    const fromSeries = computeLbssPmc(activities, "2024-01-01", "2024-01-03");
+    const fromSeries = pmc(activities, "2024-01-01", "2024-01-03");
     expect(result.atl).toBeCloseTo(fromSeries.at(-1)!.atl);
   });
 });

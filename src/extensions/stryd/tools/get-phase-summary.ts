@@ -16,9 +16,11 @@
 
 import { z } from "zod";
 import type { ToolDef, ToolContext } from "../../../tool-registry.js";
+import { config_, FIELD_NAME_REGEX } from "../../../config.js";
 import { intervalsClient } from "../../../core/intervals-client.js";
 import type { Activity, Wellness } from "../../../core/types.js";
 import { addDays } from "../../../utils/date.js";
+import { readNumericField } from "../../../utils/field-access.js";
 import { computeLbssPmc } from "../lbss-calculator.js";
 
 /** LBSS EMA の cold-start バイアスを 1% 未満に抑える助走期間（日数）*/
@@ -56,6 +58,8 @@ export const getPhaseSummaryTool: ToolDef = {
     "- phase_totals: RSS, LBSS, total time (min), total distance (km), session count\n" +
     "- weeks: per-week breakdown with totals, session count, averages (ILR, decoupling), PMC snapshot\n" +
     "- trends: weekly RSS/LBSS series and CTL ramp rate (avg weekly CTL change)\n" +
+    "LBSS is read from the configured custom field (env LBSS_FIELD, default StrydLBSSv2); " +
+    "override per-call with lbss_field (to compare fields, call twice with different lbss_field).\n" +
     "Note: start_date must be a Monday, end_date must be a Sunday. " +
     "LBSS values require Stryd data synced to Intervals (post Nov 2025).",
   schema: {
@@ -71,12 +75,23 @@ export const getPhaseSummaryTool: ToolDef = {
       .string()
       .optional()
       .describe("Optional phase name (included in response as-is, not used for filtering)"),
+    lbss_field: z
+      .string()
+      .regex(FIELD_NAME_REGEX)
+      .optional()
+      .describe(
+        'Override the LBSS custom-field name for this call ' +
+        '(e.g. "StrydLBSSv2", "StrydLBSSmod"). Defaults to env LBSS_FIELD.',
+      ),
   },
-  handler: async ({ start_date: startDate, end_date: endDate, phase_name: phaseName }: {
+  handler: async ({ start_date: startDate, end_date: endDate, phase_name: phaseName, lbss_field }: {
     start_date: string;
     end_date: string;
     phase_name?: string;
+    lbss_field?: string;
   }, ctx?: ToolContext) => {
+      const lbssField = lbss_field ?? config_.lbssField;
+      const ilrField = config_.ilrField;
       const warmupStart = addDays(startDate, -WARMUP_DAYS);
 
       // API 呼び出しは2回のみ（並列）
@@ -95,7 +110,7 @@ export const getPhaseSummaryTool: ToolDef = {
       });
 
       // LBSS PMC を全期間通しで1回計算（助走期間含む）→ 日付 → エントリの Map
-      const lbssSeries = computeLbssPmc(allActivities, warmupStart, endDate);
+      const lbssSeries = computeLbssPmc(allActivities, warmupStart, endDate, lbssField);
       const lbssByDate = new Map(lbssSeries.map((e) => [e.date, e]));
 
       // wellness を日付（YYYY-MM-DD）でインデックス化
@@ -126,7 +141,7 @@ export const getPhaseSummaryTool: ToolDef = {
             1,
           ),
           lbss: round(
-            weekActivities.reduce((s, a) => s + (a.StrydLBSSmod ?? 0), 0),
+            weekActivities.reduce((s, a) => s + (readNumericField(a, lbssField) ?? 0), 0),
             1,
           ),
           time_min: Math.round(
@@ -141,7 +156,7 @@ export const getPhaseSummaryTool: ToolDef = {
         // 平均（当該フィールドを持つセッションのみ対象）
         const averages = {
           ilr: round(
-            avg(collectNumbers(weekActivities, (a) => a.StrydILR)),
+            avg(collectNumbers(weekActivities, (a) => readNumericField(a, ilrField))),
             2,
           ),
           decoupling: round(
@@ -195,7 +210,7 @@ export const getPhaseSummaryTool: ToolDef = {
           1,
         ),
         lbss: round(
-          phaseActivities.reduce((s, a) => s + (a.StrydLBSSmod ?? 0), 0),
+          phaseActivities.reduce((s, a) => s + (readNumericField(a, lbssField) ?? 0), 0),
           1,
         ),
         time_min: Math.round(

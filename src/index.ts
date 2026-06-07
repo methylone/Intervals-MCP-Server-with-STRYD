@@ -23,7 +23,11 @@ function createServer(): McpServer {
       version: getPackageVersion(),
     },
     {
-      instructions: buildServerInstructions(config_.timezone),
+      instructions: buildServerInstructions(
+        config_.timezone,
+        config_.lbssField,
+        config_.lbssFieldLegacy,
+      ),
     }
   );
 

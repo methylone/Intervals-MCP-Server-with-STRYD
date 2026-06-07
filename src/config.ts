@@ -16,6 +16,16 @@ function isValidIanaTimeZone(timeZone: string): boolean {
 }
 
 /**
+ * Intervals.icu custom-field codes are CamelCase: letters/digits only, leading
+ * letter, no underscore (the web UI rejects `_`). The LBSS/ILR field-name env
+ * vars and the per-call `lbss_field` overrides are validated against this so a
+ * malformed name fails fast instead of silently reading `undefined`.
+ */
+export const FIELD_NAME_REGEX = /^[A-Za-z][A-Za-z0-9]*$/;
+const FIELD_NAME_ERROR =
+  "must be a CamelCase custom-field code (letters/digits, leading letter, no underscore), e.g. StrydLBSSv2";
+
+/**
  * Default stream-cache directory, resolved as an absolute path from this module's
  * own location rather than process.cwd(). The launch CWD differs across clients
  * (Claude Desktop / Codex / Linux server), so a cwd-relative default would point at
@@ -68,6 +78,23 @@ const envSchema = z.object({
       isValidIanaTimeZone,
       "ATHLETE_TIMEZONE must be a valid IANA timezone (e.g. Asia/Tokyo, UTC)",
     ),
+  // Custom-field names the Stryd aggregation tools read off each activity.
+  // Configurable so a recalibrated / renamed field (e.g. StrydLBSSv2) needs no
+  // code change. Per-call `lbss_field` overrides these; see the tool schemas.
+  // v0.6.0: the LBSS default moved StrydLBSSmod → StrydLBSSv2. Restore the old
+  // behavior with LBSS_FIELD=StrydLBSSmod.
+  LBSS_FIELD: z
+    .string()
+    .regex(FIELD_NAME_REGEX, `LBSS_FIELD ${FIELD_NAME_ERROR}`)
+    .default("StrydLBSSv2"),
+  LBSS_FIELD_LEGACY: z
+    .string()
+    .regex(FIELD_NAME_REGEX, `LBSS_FIELD_LEGACY ${FIELD_NAME_ERROR}`)
+    .default("StrydLBSSmod"),
+  ILR_FIELD: z
+    .string()
+    .regex(FIELD_NAME_REGEX, `ILR_FIELD ${FIELD_NAME_ERROR}`)
+    .default("StrydILR"),
 });
 
 export interface AppConfig {
@@ -79,6 +106,12 @@ export interface AppConfig {
   cacheEnabled: boolean;
   readOnly: boolean;
   timezone: string;
+  /** Primary LBSS custom-field name (env LBSS_FIELD, default StrydLBSSv2). */
+  lbssField: string;
+  /** Legacy LBSS field for include_legacy side-by-side (env LBSS_FIELD_LEGACY, default StrydLBSSmod). */
+  lbssFieldLegacy: string;
+  /** ILR custom-field name (env ILR_FIELD, default StrydILR). */
+  ilrField: string;
 }
 
 /**
@@ -124,6 +157,9 @@ export function loadConfig(): AppConfig {
     cacheEnabled: parsed.data.CACHE_ENABLED === "true",
     readOnly: parsed.data.READ_ONLY === "true",
     timezone: parsed.data.ATHLETE_TIMEZONE,
+    lbssField: parsed.data.LBSS_FIELD,
+    lbssFieldLegacy: parsed.data.LBSS_FIELD_LEGACY,
+    ilrField: parsed.data.ILR_FIELD,
   };
   return cached;
 }

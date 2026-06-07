@@ -18,7 +18,11 @@ multi-user service.
   computed server-side from a lower-body load metric — **LBSS** (Lower Body Stress
   Score) — via EMA, sitting next to Intervals.icu's built-in RSS-based PMC. You get a
   **dual PMC** (musculoskeletal load *and* metabolic load), ILR (Impact Loading Rate)
-  trends, and weekly / phase-level summaries aimed at ultramarathon-style review.
+  trends, and weekly / phase-level summaries aimed at ultramarathon-style review. The
+  LBSS / ILR custom-field names are configurable (`LBSS_FIELD` / `ILR_FIELD`, default
+  `StrydLBSSv2` / `StrydILR`) so a recalibrated or renamed field needs no code change —
+  see [INSTALL.md](INSTALL.md#setting-up-the-stryd-custom-fields-optional) and the
+  [field recipes](https://github.com/methylone/Intervals-MCP-Server-with-STRYD/wiki/LLM-Agent-Recipes).
 - **Core (any Intervals.icu user).** List and inspect activities, wellness, HRV
   trends, events / planned workouts (read + create / update / delete), athlete
   summaries, and stream-level analysis (splits, cardiac decoupling, grade-adjusted

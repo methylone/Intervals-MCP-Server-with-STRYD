@@ -123,6 +123,15 @@ All optional variables are documented in `.env.example`. Two worth calling out:
   Local-only tools stay available. A local mitigation only — the API key still
   grants full access. (MCPB users: use the "Read-only mode" toggle in the extension
   config.)
+- **`LBSS_FIELD`** / **`LBSS_FIELD_LEGACY`** / **`ILR_FIELD`** — the Intervals.icu
+  custom-field codes the Stryd aggregation tools read (CamelCase, no underscore).
+  Defaults: `StrydLBSSv2` / `StrydLBSSmod` / `StrydILR`. Configurable so a recalibrated
+  or renamed field needs no code change; the LBSS tools also accept a per-call
+  `lbss_field` override, and `include_legacy=true` reports `LBSS_FIELD_LEGACY` alongside.
+  **v0.6.0 changed the LBSS default `StrydLBSSmod` → `StrydLBSSv2`** — if your account only
+  has the community `StrydLBSSmod` field, either build `StrydLBSSv2` from the
+  [field recipes](https://github.com/methylone/Intervals-MCP-Server-with-STRYD/wiki/LLM-Agent-Recipes)
+  or set `LBSS_FIELD=StrydLBSSmod` to restore the previous behavior.
 
 ### Setting up the Stryd custom fields (optional)
 
@@ -139,9 +148,14 @@ community-shared fields you add to your own account — they are not built in. T
    | Stryd ILR | `StrydILR` | Knuefi |
    | Stryd ILR @Treshold | `StrydILRTreshold` | miguell |
 
-   `StrydLBSSmod` (Lower Body Stress Score) is the field the LBSS-based PMC is built on;
    `StrydILR` / `StrydILRTreshold` add the Impact Loading Rate metrics. The field codes —
    **including the `Treshold` spelling** — must match exactly; that is the real field name.
+
+   These are the community-shared fields. Note the LBSS-based PMC now defaults to
+   **`StrydLBSSv2`** (a Stryd-faithful recalibration, env `LBSS_FIELD`), which is not in
+   the community search box — build it from the
+   [field recipes](https://github.com/methylone/Intervals-MCP-Server-with-STRYD/wiki/LLM-Agent-Recipes),
+   or set `LBSS_FIELD=StrydLBSSmod` to keep using the community `StrydLBSSmod` field above.
 
 3. Once added, these values are copied onto **new Run activities**, so `get_current_pmc`,
    `get_weekly_summary`, `get_phase_summary`, and the ILR fields in `get_activity_detail`

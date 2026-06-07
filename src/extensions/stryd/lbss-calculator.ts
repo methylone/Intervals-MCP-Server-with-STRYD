@@ -10,13 +10,14 @@
  *   ATL_LBSS(t) = ATL_LBSS(t-1) × (1 - 1/7)  + LBSS(t) × (1/7)
  *   TSB_LBSS(t) = CTL_LBSS(t) - ATL_LBSS(t)
  *
- * データソース: Activity.StrydLBSSmod
+ * データソース: 呼び出し側が指定する LBSS カスタムフィールド（既定 StrydLBSSv2）。
  * 注意: Stryd フィールドは 2025 年 11 月以降のデータにのみ存在する。
  */
 
 import type { Activity } from "../../core/types.js";
 import { computeEma, type DailyEntry } from "../../utils/ema.js";
 import { dateRange } from "../../utils/date.js";
+import { readNumericField } from "../../utils/field-access.js";
 
 /** CTL の時定数（日数） */
 const CTL_TAU = 42;
@@ -46,7 +47,7 @@ export interface LbssPmcEntry {
 /**
  * アクティビティ配列から LBSS ベース PMC 系列を計算する (pure function)。
  *
- * - `StrydLBSSmod` を持たないアクティビティの LBSS は 0 として扱う
+ * - 指定フィールドを持たないアクティビティの LBSS は 0 として扱う
  * - 同日複数アクティビティの LBSS は日合算してから EMA に入力する
  * - startDate より前のアクティビティが多いほど CTL/ATL の精度が上がる
  *   （推奨: targetDate の 6 ヶ月以上前を startDate にして助走期間を確保）
@@ -54,21 +55,25 @@ export interface LbssPmcEntry {
  * @param activities - Intervals.icu アクティビティ配列
  * @param startDate  - 計算開始日 (YYYY-MM-DD, inclusive)
  * @param endDate    - 計算終了日 (YYYY-MM-DD, inclusive)
+ * @param field      - LBSS を読み取るカスタムフィールド名（呼び出し側が解決して渡す。
+ *                     pure 維持のため内部で config を読まない）
  * @returns 日別 PMC エントリの配列（startDate〜endDate の全日付、昇順）
  */
 export function computeLbssPmc(
   activities: ReadonlyArray<Activity>,
   startDate: string,
   endDate: string,
+  field: string,
 ): LbssPmcEntry[] {
-  // StrydLBSSmod を持つアクティビティのみ DailyEntry として抽出
+  // 指定フィールドを持つアクティビティのみ DailyEntry として抽出
   // date は start_date_local の先頭 10 文字 (YYYY-MM-DD) で取得
   const entries: DailyEntry[] = [];
   for (const activity of activities) {
-    if (typeof activity.StrydLBSSmod === "number") {
+    const value = readNumericField(activity, field);
+    if (value !== null) {
       entries.push({
         date: activity.start_date_local.slice(0, 10),
-        value: activity.StrydLBSSmod,
+        value,
       });
     }
   }
@@ -95,10 +100,12 @@ export function computeLbssPmc(
  *
  * @param activities - Intervals.icu アクティビティ配列（targetDate まで含む）
  * @param targetDate - 取得したい日付 (YYYY-MM-DD)
+ * @param field      - LBSS を読み取るカスタムフィールド名（呼び出し側が解決して渡す）
  */
 export function getLbssPmcAt(
   activities: ReadonlyArray<Activity>,
   targetDate: string,
+  field: string,
 ): LbssPmcEntry {
   const zero: LbssPmcEntry = { date: targetDate, ctl: 0, atl: 0, tsb: 0 };
 
@@ -111,6 +118,6 @@ export function getLbssPmcAt(
     return zero;
   }
 
-  const series = computeLbssPmc(activities, firstDate, targetDate);
+  const series = computeLbssPmc(activities, firstDate, targetDate, field);
   return series.at(-1) ?? zero;
 }

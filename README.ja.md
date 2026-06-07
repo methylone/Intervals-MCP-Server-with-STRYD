@@ -17,7 +17,12 @@ Codex など）には**解釈だけ**を任せます——推測させません�
   から EMA でサーバ側計算する第二の Performance Management Chart を、Intervals.icu 内蔵の
   RSS ベース PMC と並べて提供します。**dual PMC**（筋骨格系負荷 *と* 代謝負荷）、ILR
   （Impact Loading Rate）トレンド、ウルトラマラソン志向のレビューに向けた週次・フェーズ
-  単位のサマリーが得られます。
+  単位のサマリーが得られます。LBSS / ILR のカスタムフィールド名は設定可能
+  （`LBSS_FIELD` / `ILR_FIELD`、既定 `StrydLBSSv2` / `StrydILR`）で、較正し直した／改名した
+  フィールドでもコード変更なしに対応できます。詳細は
+  [INSTALL.md](INSTALL.md#setting-up-the-stryd-custom-fields-optional) と
+  [フィールドレシピ](https://github.com/methylone/Intervals-MCP-Server-with-STRYD/wiki/LLM-Agent-Recipes)
+  を参照。
 - **コア（すべての Intervals.icu ユーザ向け）。** アクティビティ、ウェルネス、HRV トレンド、
   イベント／計画ワークアウト（取得＋作成・更新・削除）、アスリートサマリー、ストリーム
   単位の分析（スプリット、心拍デカップリング、勾配補正ペース、カスタムパワー/HR ゾーン）。

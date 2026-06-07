@@ -4,7 +4,11 @@
  * Helps the client understand conventions, recommended workflows,
  * and domain-specific context for this server.
  */
-export function buildServerInstructions(timeZone: string): string {
+export function buildServerInstructions(
+  timeZone: string,
+  lbssField: string,
+  lbssFieldLegacy: string,
+): string {
   return `
 This server provides access to Intervals.icu training data for a single athlete.
 
@@ -20,7 +24,7 @@ This server provides access to Intervals.icu training data for a single athlete.
 2. get_activity_detail — Full metrics for one activity (power/HR zones, Stryd metrics, decoupling). Requires an activity_id from step 1.
 3. get_activity_streams_summary — Split-based analysis with cardiac decoupling and pacing. Requires an activity_id from step 1.
 4. search_similar_activities — Find past activities in a date range matching optional filters (type, name keyword, distance, duration, feels-like temperature). Returns per-activity derived metrics (pace, efficiency factor, weather) and an aggregate summary (avg RSS/LBSS/ILR). Temperature filter uses Open-Meteo \`average_feels_like\`; activities with \`has_weather=false\` are excluded when temp filter is set. Use to estimate LBSS/RSS of planned sessions from similar past efforts.
-5. get_weekly_summary — Mon–Sun aggregated training load (RSS, LBSS, time, distance) and end-of-week PMC values for both RSS and LBSS.
+5. get_weekly_summary — Mon–Sun aggregated training load (RSS, LBSS, time, distance) and end-of-week PMC values for both RSS and LBSS. LBSS is read from the configured custom field (override per call with lbss_field); pass include_legacy=true to also report the legacy LBSS field side by side.
 6. get_phase_summary — Aggregate a multi-week training phase (start_date = Monday, end_date = Sunday). Returns phase totals, per-week breakdown (totals + averages + PMC snapshot for both RSS and LBSS), and trends with CTL ramp rate. Use for block-level analysis (training blocks, e.g., base, build, taper) and ramp rate diagnostics.
 7. get_current_pmc — Today's dual PMC snapshot: RSS-based (from Intervals.icu) and LBSS-based (computed server-side).
 8. get_wellness — Daily wellness data (HRV, resting HR, sleep, weight) for a date range. Returns the raw Intervals.icu wellness records, including any custom fields the athlete logs (e.g. kcalConsumed).
@@ -55,6 +59,7 @@ This server provides access to Intervals.icu training data for a single athlete.
 ## Metrics reference
 - When Stryd power data is present, the server surfaces: RSS (Running Stress Score), LBSS (Lower Body Stress Score), ILR (Impact Loading Rate).
 - LBSS-based PMC (CTL/ATL/TSB) is computed server-side via EMA, distinct from Intervals.icu's built-in RSS-based PMC. Tools that return PMC provide both.
+- The LBSS and ILR custom-field names are configurable (env LBSS_FIELD / ILR_FIELD; the LBSS aggregation tools also accept a per-call lbss_field). This server reads LBSS from "${lbssField}" by default, with "${lbssFieldLegacy}" available as the legacy field (get_weekly_summary / get_current_pmc include_legacy=true reports both). If your account uses different custom-field codes, set LBSS_FIELD / ILR_FIELD or pass lbss_field. Field recipes: https://github.com/methylone/Intervals-MCP-Server-with-STRYD/wiki/LLM-Agent-Recipes
 
 ## Wellness data: field interpretation
 - Subjective fields (sleepQuality, soreness, fatigue, motivation) in Intervals.icu commonly use a 1–4 scale. The direction depends on the logging app — verify yours. (HRV4Training, for example, uses 1 = best, 4 = worst, which is counter-intuitive.)

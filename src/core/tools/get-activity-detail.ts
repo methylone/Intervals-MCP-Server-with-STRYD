@@ -9,7 +9,7 @@ export const getActivityDetailTool: ToolDef = {
   description:
     "Fetch complete data for a single Intervals.icu activity, including " +
     "power/HR zone distributions (icu_zone_times, icu_hr_zone_times), " +
-    "Stryd metrics (StrydLBSSmod, StrydILR), decoupling, and all other fields. " +
+    "Stryd metrics (the configured LBSS/ILR custom fields), decoupling, and all other fields. " +
     "Use get_activities first to find the activity_id.",
   schema: {
     activity_id: z

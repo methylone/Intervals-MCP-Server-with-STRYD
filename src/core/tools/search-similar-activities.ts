@@ -1,8 +1,10 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 import { z } from "zod";
 import type { ToolDef, ToolContext } from "../../tool-registry.js";
+import { config_, FIELD_NAME_REGEX } from "../../config.js";
 import { intervalsClient } from "../intervals-client.js";
 import type { Activity } from "../types.js";
+import { readNumericField } from "../../utils/field-access.js";
 
 export function formatPace(movingTimeSec: number, distanceMeters: number): string | null {
   if (!distanceMeters || distanceMeters <= 0) return null;
@@ -81,6 +83,14 @@ export const searchSimilarActivitiesTool: ToolDef = {
           .positive()
           .optional()
           .describe("Maximum number of results to return (default: 20)"),
+        lbss_field: z
+          .string()
+          .regex(FIELD_NAME_REGEX)
+          .optional()
+          .describe(
+            'Override the LBSS custom-field name for the lbss output and "lbss" sort ' +
+            '(e.g. "StrydLBSSv2", "StrydLBSSmod"). Defaults to env LBSS_FIELD.',
+          ),
   },
   handler: async ({
       oldest,
@@ -95,6 +105,7 @@ export const searchSimilarActivitiesTool: ToolDef = {
       temp_max_celsius,
       sort_by = "date",
       limit = 20,
+      lbss_field,
     }: {
       oldest: string;
       newest: string;
@@ -108,7 +119,10 @@ export const searchSimilarActivitiesTool: ToolDef = {
       temp_max_celsius?: number;
       sort_by?: "date" | "distance" | "rss" | "lbss";
       limit?: number;
+      lbss_field?: string;
     }, ctx?: ToolContext) => {
+      const lbssField = lbss_field ?? config_.lbssField;
+      const ilrField = config_.ilrField;
       const raw = await intervalsClient.getActivities(oldest, newest, { signal: ctx?.signal });
       const activities = raw as Activity[];
 
@@ -171,7 +185,7 @@ export const searchSimilarActivitiesTool: ToolDef = {
           case "rss":
             return ((b.icu_training_load ?? 0) - (a.icu_training_load ?? 0));
           case "lbss":
-            return ((b.StrydLBSSmod ?? 0) - (a.StrydLBSSmod ?? 0));
+            return ((readNumericField(b, lbssField) ?? 0) - (readNumericField(a, lbssField) ?? 0));
           case "date":
           default:
             return b.start_date_local.localeCompare(a.start_date_local);
@@ -199,8 +213,8 @@ export const searchSimilarActivitiesTool: ToolDef = {
           duration_min: durationMin,
           elevation_gain_m: elevGain,
           rss: a.icu_training_load ?? null,
-          lbss: a.StrydLBSSmod ?? null,
-          ilr: a.StrydILR ?? null,
+          lbss: readNumericField(a, lbssField),
+          ilr: readNumericField(a, ilrField),
           avg_hr: avgHr,
           avg_power: avgPower,
           pace_per_km: formatPace(a.moving_time, a.distance),
