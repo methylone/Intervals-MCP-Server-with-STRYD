@@ -1,6 +1,6 @@
 {
   "name": "intervals-mcp-with-stryd",
-  "version": "0.3.1",
+  "version": "0.4.0",
   "description": "An Intervals.icu MCP server built for Stryd runners — power-based running analysis (a dual PMC with RSS and LBSS), designed so the LLM never does the math.",
   "license": "AGPL-3.0-or-later",
   "type": "module",

@@ -88,16 +88,19 @@ LLM 不要）——自動化、`jq` へのパイプ、簡単な確認に便利�
 - [INSTALL.ja.md](INSTALL.ja.md) — 前提条件とクライアント設定（MCPB / npx / ソース）
 - [docs/CLI.md](docs/CLI.md) — シェルからツールを実行する（英語）
 - [ARCHITECTURE.md](ARCHITECTURE.md) — コード構成と拡張方法（英語）
-- [SECURITY.ja.md](SECURITY.ja.md) — **HTTP モードを使う前に必読**
+- [SECURITY.ja.md](SECURITY.ja.md) — **セキュリティとプライバシーモデル**: 通信先・
+  読み書きの範囲・キーとキャッシュの保管場所・HTTP モード
 - [ROADMAP.md](ROADMAP.md) — 今後の予定
 - [`training-knowledge-template/`](training-knowledge-template/) — AI クライアント用の
   分析ナレッジを自分で作るためのテンプレート
 
-## セキュリティ
+## セキュリティとプライバシー
 
-HTTP トランスポートには **アプリケーション層の認証がありません**。個人利用では stdio
-（または MCPB / npx）でローカルに動かし、HTTP モードを公開インターネットに晒さないでください。
-[SECURITY.ja.md](SECURITY.ja.md) を参照。
+通信先は **1 つ**（intervals.icu）のみ、書き込めるのは **Intervals.icu のカレンダー
+イベントだけ**、API キーはログに出さず、**テレメトリは送りません**。HTTP トランスポートには
+**アプリケーション層の認証がありません** — 個人利用では stdio（または MCPB / npx）でローカルに
+動かし、HTTP モードを公開インターネットに晒さないでください。キャッシュの中身・キーの影響範囲・
+ビルド検証・アンインストールなどの詳細は [SECURITY.ja.md](SECURITY.ja.md) を参照。
 
 ## コントリビューション
 

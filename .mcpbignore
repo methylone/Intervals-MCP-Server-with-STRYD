@@ -1,37 +1,45 @@
 # Files excluded from the .mcpb bundle.
 # The bundle ships: manifest.json + build/ + node_modules/ (prod only) +
 # package.json + LICENSE + README.md. Everything else is dev/source/infra.
+#
+# IMPORTANT: every pattern is anchored to the bundle root with a leading "/".
+# An UN-anchored pattern like `src/` or `*.md` also matches *inside*
+# node_modules (e.g. node_modules/debug/src/index.js), which silently breaks
+# bundled dependencies at runtime (MODULE_NOT_FOUND). Keep node_modules intact.
 
 # TypeScript sources & tests (the bundle ships compiled build/ only)
-src/
-__tests__/
-tsconfig.json
+/src/
+/__tests__/
+/tsconfig.json
+/scripts/
 
 # Docs & guidance dirs — keep only the top-level README.md in the bundle
-docs/
-training-knowledge-template/
-*.md
+/docs/
+/training-knowledge-template/
+/*.md
 !/README.md
 
 # Infra / containers / CI
-Dockerfile
-.dockerignore
-docker-compose.yml
-.github/
+/Dockerfile
+/.dockerignore
+/docker-compose.yml
+/.github/
 
 # Secrets & local env (defense in depth; these are also gitignored)
-.env
-.env.*
-cache/
+/.env
+/.env.*
+/cache/
+# PII deny-list (its very contents are the literals we forbid — never bundle it)
+/.pii-forbidden
 
 # Repo / sync / OS cruft
-.git/
-.gitignore
-.stfolder/
-.DS_Store
+/.git/
+/.gitignore
+/.stfolder/
+/.DS_Store
 
 # Internal curation list (never public)
-PUBLIC_MANIFEST.md
+/PUBLIC_MANIFEST.md
 
 # Never nest a bundle inside the bundle
-*.mcpb
+/*.mcpb

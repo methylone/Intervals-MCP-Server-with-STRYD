@@ -6,6 +6,34 @@ import type { ActivityStreamRaw, CalendarEvent, CreateEventInput, UpdateEventInp
 const BASE_URL = "https://intervals.icu/api/v1";
 const DEFAULT_REQUEST_TIMEOUT_MS = 60_000;
 
+/**
+ * Error for a non-2xx Intervals.icu response.
+ *
+ * `message` carries the upstream response body so the consumer-facing error
+ * (the MCP isError text the LLM sees / the CLI's stderr the human reads) keeps
+ * the diagnostic detail. `logSafeMessage` is a body-free summary (status +
+ * statusText only) for *persistent* log sinks: the upstream body can contain
+ * account data, and a server log line must not retain it. Adapters that write
+ * to a persistent log (see src/adapters/mcp.ts) log `logSafeMessage` instead of
+ * `message` — the convention is purely structural (a string property), so no
+ * adapter needs to import this class.
+ */
+export class IntervalsApiError extends Error {
+  readonly status: number;
+  readonly statusText: string;
+  /** Body-free summary, safe to write to persistent logs. */
+  readonly logSafeMessage: string;
+
+  constructor(status: number, statusText: string, body: string) {
+    const summary = `Intervals.icu API error: ${status} ${statusText}`;
+    super(body ? `${summary} — ${body}` : summary);
+    this.name = "IntervalsApiError";
+    this.status = status;
+    this.statusText = statusText;
+    this.logSafeMessage = summary;
+  }
+}
+
 type RequestOptions = {
   signal?: AbortSignal;
   timeoutMs?: number;
@@ -78,9 +106,7 @@ async function request<T>(path: string, options?: {
 
   if (!response.ok) {
     const body = await response.text().catch(() => "");
-    throw new Error(
-      `Intervals.icu API error: ${response.status} ${response.statusText}${body ? ` — ${body}` : ""}`
-    );
+    throw new IntervalsApiError(response.status, response.statusText, body);
   }
 
   // DELETE returns no body

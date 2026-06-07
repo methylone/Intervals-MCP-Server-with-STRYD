@@ -43,6 +43,9 @@ CLAUDE.md がないと、Claude Code は毎回「このプロジェクトは何�
 Claude Code に大きなタスクを一度に投げると品質が落ちる。
 以下の粒度で1ステップずつ進める。
 
+公開ドキュメント内の例示 email は RFC 2606 予約ドメイン（`example.com` / `.test` など）を使う。
+公開ドキュメント内の例示 home path は username `you`（例: `/Users/you/` / `/home/you/`）を使う。
+
 ### Phase 1 の具体的な進行手順
 
 #### Step 1: プロジェクト初期化

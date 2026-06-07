@@ -90,16 +90,20 @@ raw data only; it does **not** apply the methodology. See [docs/CLI.md](docs/CLI
 - [INSTALL.md](INSTALL.md) — prerequisites and client setup (MCPB / npx / source)
 - [docs/CLI.md](docs/CLI.md) — running the tools from a shell
 - [ARCHITECTURE.md](ARCHITECTURE.md) — code layout and how to extend it
-- [SECURITY.md](SECURITY.md) — **read before using HTTP mode**
+- [SECURITY.md](SECURITY.md) — **security & privacy model**: what it connects to,
+  what it reads/writes, where your key and cache live, HTTP mode
 - [ROADMAP.md](ROADMAP.md) — what's planned next
 - [`training-knowledge-template/`](training-knowledge-template/) — build your own
   analysis knowledge for your AI client
 
-## Security
+## Security & privacy
 
-The HTTP transport has **no application-layer authentication**. Run the server locally
-over stdio (or MCPB / npx) for personal use, and never expose HTTP mode to the public
-internet. See [SECURITY.md](SECURITY.md).
+It talks to **one** host (intervals.icu), writes **only to your Intervals.icu calendar
+events**, never logs your API key, and ships **no telemetry**. The HTTP transport has
+**no application-layer authentication** — run locally over stdio (or MCPB / npx) for
+personal use and never expose HTTP mode to the public internet. Full details — cache
+contents, key blast radius, build verification, uninstall — in
+[SECURITY.md](SECURITY.md).
 
 ## Contributing
 

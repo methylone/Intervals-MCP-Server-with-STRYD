@@ -4,6 +4,10 @@
 !.env.example
 intervals_api_keys.txt
 
+# PII deny-list for the artifact/metadata guards (real name/email/home path).
+# Never committed, never published — its contents are the literals we forbid.
+.pii-forbidden
+
 # Build output / deps / cache
 build/
 node_modules/

@@ -62,9 +62,21 @@ export function registerToolDef(server: McpServer, t: ToolDef): void {
         };
       } catch (err) {
         const elapsedMs = Date.now() - startedAt;
-        const message = err instanceof Error ? err.message : String(err);
+        // This console.error lands in a *persistent* client log (e.g. Claude
+        // Desktop's ~/Library/Logs/Claude/mcp*.log). If the error carries a
+        // body-free `logSafeMessage` (see IntervalsApiError), log that instead
+        // of err.message so an upstream response body — which can contain
+        // account data — never persists to disk. The full message is still
+        // thrown below, so the LLM-facing isError text keeps the detail.
+        const logSafe = (err as { logSafeMessage?: unknown }).logSafeMessage;
+        const logMessage =
+          typeof logSafe === "string"
+            ? logSafe
+            : err instanceof Error
+              ? err.message
+              : String(err);
         console.error(
-          `[intervals-mcp-server] tool error name=${t.name} requestId=${requestId} elapsed_ms=${elapsedMs} message=${message}`
+          `[intervals-mcp-server] tool error name=${t.name} requestId=${requestId} elapsed_ms=${elapsedMs} message=${logMessage}`
         );
         throw err;
       } finally {
