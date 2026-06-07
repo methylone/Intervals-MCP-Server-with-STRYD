@@ -115,6 +115,11 @@ npm run build
 - **`CACHE_ENABLED`** — `true`（デフォルト）または `false`。`false` にするとストリームキャッシュを
   完全にバイパスします（常に新規取得）。チャットから `set_cache_enabled` ツールでランタイムに
   切り替えることもできます。ランタイムの状態は再起動時にこの値へ戻ります。
+- **`READ_ONLY`** — `false`（デフォルト）または `true`。`true` にするとカレンダー書き込み 4 ツール
+  （`create_events` / `update_event` / `delete_event` / `delete_events`）を登録せず、サーバは
+  Intervals.icu アカウントに書き込めなくなります。ローカル専用ツールは残ります。あくまでローカルの
+  緩和策で、API キー自体は全アクセス権を持ちます。（MCPB 利用時は拡張設定の「Read-only mode」
+  トグルを使用。）
 
 ### Stryd カスタムフィールドの設定（任意）
 

@@ -6,6 +6,7 @@ import { intervalsClient } from "../intervals-client.js";
 export const deleteEventTool: ToolDef = {
   name: "delete_event",
   title: "Delete Event",
+  writesAccount: true,
   description:
     "Delete a calendar event from Intervals.icu. " +
     "Use get_events first to find the event ID. This action is irreversible.",

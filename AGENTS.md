@@ -64,3 +64,11 @@ be covered by unit tests. Run `npm test` before proposing changes.
   `src/tool-registry.ts`.
 - Keep deterministic math in pure functions and unit-test it; hand the LLM finished
   numbers to interpret.
+
+## If you fork this repo
+
+Re-point the PII guards at the fork's identity: edit `pii-guard.config.json` (public
+allowlist — author names / email domains / placeholder usernames) and create a
+gitignored `.pii-forbidden` listing your real name/email/home path (one literal per
+line). Details in `docs/DEVELOPMENT_GUIDE.md` (PII ガード). Optionally enable the
+secret-scan hook: `git config core.hooksPath .githooks`.

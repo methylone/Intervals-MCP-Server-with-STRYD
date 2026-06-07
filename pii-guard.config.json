@@ -1,0 +1,15 @@
+{
+  "description": "Identity allowlist for the PII-guard tests and scripts/check-mcpb-pii.mjs. These are the PUBLIC values that are legitimately allowed to appear in published artifacts. If you FORK this repo: replace these with your own identity, and create a private (gitignored) .pii-forbidden listing your real name/email/home path/etc. (one literal per line). See docs/DEVELOPMENT_GUIDE.md. Do NOT put real/secret PII in this file — it is public.",
+  "allowedAuthorNames": ["methylone"],
+  "allowedEmails": [],
+  "allowedEmailDomains": [
+    "users.noreply.github.com",
+    "example.com",
+    "example.org",
+    "example.net",
+    "test",
+    "invalid",
+    "example"
+  ],
+  "placeholderUsernames": ["you"]
+}

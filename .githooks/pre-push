@@ -1,0 +1,43 @@
+#!/bin/sh
+# Thin gitleaks pre-push guard (v0.5.0).
+#
+# Catches the one gap the in-repo PII guards don't cover: an *unknown* credential
+# accidentally pasted into a file (the .pii-forbidden deny-list and the log
+# sentinel cover *known* PII and log paths). Uses gitleaks' default ruleset only
+# — no custom PII patterns here (a public rule file would be the same trap as
+# putting real PII in test code).
+#
+# Best-effort by design: if gitleaks is not installed, it warns once and lets the
+# push through. It is NOT a hard dependency and is NOT wired into `npm test` or
+# publish — the release checklist (PUBLIC_MANIFEST.md §8) is the real enforcement.
+#
+# Enable once per clone:  git config core.hooksPath .githooks
+# Install gitleaks:       brew install gitleaks   (needs v8.19+ for `gitleaks git`)
+
+if ! command -v gitleaks >/dev/null 2>&1; then
+  echo "pre-push: gitleaks not installed — skipping secret scan (brew install gitleaks to enable)." >&2
+  exit 0
+fi
+
+zero="0000000000000000000000000000000000000000"
+status=0
+
+# stdin: <local ref> <local oid> <remote ref> <remote oid> per ref being pushed.
+while read -r _local_ref local_oid _remote_ref remote_oid; do
+  [ "$local_oid" = "$zero" ] && continue           # branch deletion — nothing to scan
+  if [ "$remote_oid" = "$zero" ]; then
+    log_opts="$local_oid"                           # new branch: all reachable commits
+  else
+    log_opts="$remote_oid..$local_oid"              # only the commits being pushed
+  fi
+  if ! gitleaks git --no-banner --redact --log-opts="$log_opts" .; then
+    status=1
+  fi
+done
+
+if [ "$status" -ne 0 ]; then
+  echo "pre-push: gitleaks found potential secrets in the commits being pushed — aborted." >&2
+  echo "Review the findings above. For a false positive, see gitleaks allowlisting in docs/DEVELOPMENT_GUIDE.md." >&2
+  exit 1
+fi
+exit 0

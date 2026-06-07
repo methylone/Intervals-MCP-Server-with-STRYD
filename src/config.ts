@@ -53,6 +53,14 @@ const envSchema = z.object({
   CACHE_ENABLED: z
     .enum(["true", "false"])
     .default("true"),
+  // When "true", the four account-writing tools (create_events / update_event /
+  // delete_event / delete_events) are not registered. Local-only side effects
+  // (clear_cache / set_cache_enabled) are unaffected. See isReadOnly() — the
+  // tool filter reads this WITHOUT triggering full credential validation, so
+  // `cli list` works read-only without a configured .env.
+  READ_ONLY: z
+    .enum(["true", "false"])
+    .default("false"),
   ATHLETE_TIMEZONE: z
     .string()
     .default("UTC")
@@ -69,7 +77,18 @@ export interface AppConfig {
   port: number;
   cacheDir: string;
   cacheEnabled: boolean;
+  readOnly: boolean;
   timezone: string;
+}
+
+/**
+ * Whether account-writing tools should be withheld. Reads process.env directly
+ * (no loadConfig) so the credential-free paths — `cli list` / `cli --help` /
+ * tool enumeration — can apply READ_ONLY without a valid .env. The validated
+ * `config_.readOnly` mirrors this for the server path (creds already required).
+ */
+export function isReadOnly(): boolean {
+  return process.env.READ_ONLY === "true";
 }
 
 let cached: AppConfig | null = null;
@@ -103,6 +122,7 @@ export function loadConfig(): AppConfig {
     port: parseInt(parsed.data.MCP_PORT, 10),
     cacheDir: parsed.data.CACHE_DIR ?? defaultCacheDir(),
     cacheEnabled: parsed.data.CACHE_ENABLED === "true",
+    readOnly: parsed.data.READ_ONLY === "true",
     timezone: parsed.data.ATHLETE_TIMEZONE,
   };
   return cached;

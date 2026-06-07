@@ -117,6 +117,12 @@ All optional variables are documented in `.env.example`. Two worth calling out:
   stream cache entirely (always fetch fresh). You can also toggle this at runtime
   from the chat with the `set_cache_enabled` tool; the runtime state resets to this
   value on restart.
+- **`READ_ONLY`** — `false` (default) or `true`. Set `true` to withhold the four
+  calendar-writing tools (`create_events` / `update_event` / `delete_event` /
+  `delete_events`); the server then cannot write to your Intervals.icu account.
+  Local-only tools stay available. A local mitigation only — the API key still
+  grants full access. (MCPB users: use the "Read-only mode" toggle in the extension
+  config.)
 
 ### Setting up the Stryd custom fields (optional)
 

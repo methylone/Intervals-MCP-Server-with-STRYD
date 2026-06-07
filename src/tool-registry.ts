@@ -10,6 +10,7 @@
  * src/index.ts. Both index.ts and cli.ts import TOOLS from here.
  */
 import type { ZodRawShape } from "zod";
+import { isReadOnly } from "./config.js";
 import { getActivitiesTool } from "./core/tools/get-activities.js";
 import { getActivityDetailTool } from "./core/tools/get-activity-detail.js";
 import { getWellnessTool } from "./core/tools/get-wellness.js";
@@ -36,6 +37,12 @@ export interface ToolDef {
   schema: ZodRawShape;
   /** Returns raw data on success; throws on hard failure. */
   handler: (args: any, context?: ToolContext) => Promise<unknown>;
+  /**
+   * True for tools that write to the Intervals.icu account (calendar events).
+   * READ_ONLY mode withholds these. Tools with only local side effects
+   * (clear_cache / set_cache_enabled) are NOT marked and stay available.
+   */
+  writesAccount?: boolean;
 }
 
 export interface ToolContext {
@@ -63,3 +70,14 @@ export const TOOLS: ToolDef[] = [
   getWeeklySummaryTool,
   getPhaseSummaryTool,
 ];
+
+/**
+ * Tools active for the current mode. In READ_ONLY mode the account-writing
+ * tools (writesAccount) are withheld; everything else (incl. local-only
+ * clear_cache / set_cache_enabled) stays. Both transports — the MCP server
+ * (index.ts) and the CLI (cli.ts) — MUST go through this single helper so the
+ * filter can never be applied to one surface but not the other.
+ */
+export function getActiveTools(): ToolDef[] {
+  return isReadOnly() ? TOOLS.filter((t) => !t.writesAccount) : TOOLS;
+}

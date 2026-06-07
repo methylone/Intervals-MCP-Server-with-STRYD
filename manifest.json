@@ -2,7 +2,7 @@
   "manifest_version": "0.3",
   "name": "intervals-mcp-with-stryd",
   "display_name": "Intervals MCP with STRYD",
-  "version": "0.4.0",
+  "version": "0.5.0",
   "description": "An Intervals.icu MCP server built for Stryd runners — power-based running analysis (a dual PMC with RSS and LBSS), designed so the LLM never does the math.",
   "author": {
     "name": "methylone"
@@ -36,6 +36,8 @@
         "INTERVALS_ATHLETE_ID": "${user_config.athlete_id}",
         "INTERVALS_API_KEY": "${user_config.api_key}",
         "ATHLETE_TIMEZONE": "${user_config.timezone}",
+        "READ_ONLY": "${user_config.read_only}",
+        "CACHE_ENABLED": "${user_config.cache_enabled}",
         "CACHE_DIR": "${HOME}/.intervals-mcp-with-stryd/cache/streams"
       }
     }
@@ -50,7 +52,7 @@
     "api_key": {
       "type": "string",
       "title": "Intervals.icu API Key",
-      "description": "API key from Intervals.icu → Settings → Developer. Stored in your OS keychain.",
+      "description": "API key from Intervals.icu → Settings → Developer. Stored in your OS keychain. Grants full account access — see Security & privacy: https://github.com/methylone/Intervals-MCP-Server-with-STRYD/blob/main/SECURITY.md",
       "required": true,
       "sensitive": true
     },
@@ -60,6 +62,20 @@
       "description": "IANA timezone name, e.g. Asia/Tokyo or UTC. Affects \"today\" and Mon–Sun week boundaries.",
       "required": false,
       "default": "UTC"
+    },
+    "read_only": {
+      "type": "boolean",
+      "title": "Read-only mode",
+      "description": "Withhold the four calendar-writing tools (no writes to your Intervals.icu account). See https://github.com/methylone/Intervals-MCP-Server-with-STRYD/blob/main/SECURITY.md",
+      "required": false,
+      "default": false
+    },
+    "cache_enabled": {
+      "type": "boolean",
+      "title": "Enable stream cache",
+      "description": "Cache activity streams on disk for faster re-analysis. See https://github.com/methylone/Intervals-MCP-Server-with-STRYD/blob/main/SECURITY.md",
+      "required": false,
+      "default": true
     }
   },
   "compatibility": {

@@ -6,6 +6,7 @@ import { intervalsClient } from "../intervals-client.js";
 export const updateEventTool: ToolDef = {
   name: "update_event",
   title: "Update Event",
+  writesAccount: true,
   description:
     "Update an existing calendar event on Intervals.icu. " +
     "Use get_events first to find the event ID. " +

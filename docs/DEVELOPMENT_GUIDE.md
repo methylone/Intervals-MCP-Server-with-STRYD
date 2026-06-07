@@ -261,3 +261,54 @@ intervals-mcp-server/
     ├── ema.test.ts
     └── lbss-calculator.test.ts
 ```
+
+## PII ガード（配布物への個人情報混入防止）
+
+このリポジトリには、公開物（npm tarball / `.mcpb` / git）へ個人情報が混入するのを
+機械的に防ぐガードが入っている。何を検査するか:
+
+- **`__tests__/metadata-pii.test.ts`** — `package.json` / `manifest.json` の
+  author・email を検査（`npm test` で走る）。
+- **`__tests__/artifact-pii.test.ts`** — `npm pack` した tarball を展開し、home パス /
+  非許可 email / deny-list 文字列を走査。
+- **`__tests__/log-sentinel.test.ts`** — sentinel 資格情報がログ（stderr）に出ないこと、
+  および Intervals.icu のエラー body が永続ログに残らないことを検査。
+- **`__tests__/console-error-allowlist.test.ts`** — `console.error` サイトを固定し、
+  新規ログ追加を検知（PII を出しうる新経路のレビューを強制）。
+- **`scripts/check-mcpb-pii.mjs`** — `.mcpb` バンドルの PII grep（リリース時に実行、
+  `npm run mcpb:pack` に内蔵）。deny-list / home パス / email の検査は **own files のみ**
+  （`node_modules` はスキップ — 自分の PII は自作・同梱ファイル経由でしか混入しないため）。
+  **再検討トリガ**: 将来 native build や `postinstall` を持つ依存を追加した場合、ビルド成果物に
+  ローカルパスが埋まり得るので、この own-files スコープを見直すこと（供給網は gitleaks /
+  将来の npm provenance が担当）。
+
+### fork する場合
+
+ガードは identity を `pii-guard.config.json`（公開・リポジトリ root）から読む。fork したら:
+
+1. `pii-guard.config.json` の `allowedAuthorNames` / `allowedEmails` /
+   `allowedEmailDomains` / `placeholderUsernames` を**自分の identity** に書き換える
+   （このファイルは公開されるので、入れてよいのは公開してよい値だけ）。
+2. リポジトリ root に **`.pii-forbidden`**（gitignored・非公開）を作り、**自分の実名・
+   実メアド・home パス・内部ホスト名・地名**などを 1 行 1 文字列で列挙する。テストと
+   `check-mcpb-pii.mjs` がこのファイルを読み、配布物に出ていないか検査する（ファイルが
+   無ければ deep チェックは skip、構造チェックは走る）。
+3. log-sentinel / console-error-allowlist は identity 非依存なのでそのまま効く。
+
+公開ドキュメント内の例示 email は RFC 2606 予約ドメイン（`example.com` / `.test` 等）、
+例示 home path は username `you` を使う（ガードの許可例外と一致させる規約）。
+
+### gitleaks（未知の credential の防御・任意）
+
+既知 PII は上記ガードが守る。「新規ファイルにうっかり貼った**未知の** credential」だけが
+残る穴で、これは [gitleaks](https://github.com/gitleaks/gitleaks) のデフォルトルールで塞ぐ。
+
+```bash
+brew install gitleaks                       # v8.19+（gitleaks git サブコマンド）
+git config core.hooksPath .githooks         # 一度きり。pre-push で push 対象コミットを走査
+```
+
+hook は**ソフト依存**（gitleaks 未インストールなら警告して素通し）。`npm test` や publish には
+組み込まない。リリース前は私有・公開両クローンで `gitleaks git` を実行し 0 件を確認する
+（PUBLIC_MANIFEST §8、これが enforcement の本体）。カスタム PII ルールは書かない
+（公開 config にパターンを書くのは `.pii-forbidden` を公開するのと同じ罠）。

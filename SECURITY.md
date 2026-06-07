@@ -55,6 +55,10 @@ but you are in control of which tool calls you approve (see *First run* below).
   `Authorization` header to intervals.icu.
 - **Revoke / rotate** any time at Intervals.icu → *Settings → Developer*. Do this
   immediately if a key is ever exposed.
+- **Read-only mode** (`READ_ONLY=true`, or the "Read-only mode" toggle in the
+  Claude Desktop extension config) withholds the four calendar-writing tools, so
+  the server cannot write to your account at all. This is a *local* mitigation —
+  the key itself still grants full access, so treat and store it accordingly.
 
 ## The on-disk stream cache
 

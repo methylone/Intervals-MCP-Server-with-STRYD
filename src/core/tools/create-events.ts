@@ -28,6 +28,7 @@ const eventSchema = z.object({
 export const createEventsTool: ToolDef = {
   name: "create_events",
   title: "Create Events",
+  writesAccount: true,
   description:
     "Create one or more calendar events (planned workouts, races, notes) on Intervals.icu. " +
     "Accepts a single event or an array for batch creation (e.g., a full week of planned training). " +

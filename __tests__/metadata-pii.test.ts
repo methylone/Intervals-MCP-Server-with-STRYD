@@ -15,12 +15,17 @@ import { describe, it, expect } from "vitest";
 import { readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { dirname, join } from "node:path";
-import { EMAIL_RE, isAllowedEmail, loadForbiddenStrings } from "./helpers/pii.js";
+import {
+  ALLOWED_AUTHOR_NAMES,
+  EMAIL_RE,
+  isAllowedEmail,
+  loadForbiddenStrings,
+} from "./helpers/pii.js";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const repoRoot = join(__dirname, "..");
 
-const ALLOWED_NAMES = new Set(["methylone"]);
+const ALLOWED_NAMES = ALLOWED_AUTHOR_NAMES;
 const FILES = ["package.json", "manifest.json"] as const;
 
 function readJson(name: string): { raw: string; data: Record<string, unknown> } {

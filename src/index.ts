@@ -9,9 +9,10 @@ import express from "express";
 import { randomUUID } from "node:crypto";
 import { pathToFileURL } from "node:url";
 import { realpathSync } from "node:fs";
-import { TOOLS } from "./tool-registry.js";
+import { getActiveTools } from "./tool-registry.js";
 import { registerToolDef } from "./adapters/mcp.js";
 import { buildServerInstructions } from "./instructions.js";
+import { getPackageVersion } from "./version.js";
 
 const buildSha = process.env.BUILD_SHA ?? "unknown";
 
@@ -19,15 +20,17 @@ function createServer(): McpServer {
   const server = new McpServer(
     {
       name: "intervals-mcp-server",
-      version: "0.1.0",
+      version: getPackageVersion(),
     },
     {
       instructions: buildServerInstructions(config_.timezone),
     }
   );
 
-  // All 17 tools are registered via the transport-free ToolDef registry.
-  for (const t of TOOLS) registerToolDef(server, t);
+  // Tools are registered via the transport-free ToolDef registry. READ_ONLY
+  // mode withholds the account-writing tools (getActiveTools handles the filter
+  // identically for the CLI, so the two surfaces can't diverge).
+  for (const t of getActiveTools()) registerToolDef(server, t);
 
   return server;
 }

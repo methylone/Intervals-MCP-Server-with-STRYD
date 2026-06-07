@@ -13,6 +13,7 @@ This server provides access to Intervals.icu training data for a single athlete.
 - Week boundaries: Monday–Sunday (ISO week).
 - Activity IDs: Short alphanumeric strings like "i12345678" — these are NOT activity names. Always obtain IDs from get_activities results before calling other tools.
 - Response format: All tool responses return JSON strings.
+- Read-only mode: When the server runs with READ_ONLY=true, the four account-writing tools (create_events, update_event, delete_event, delete_events) are not registered and are unavailable.
 
 ## Recommended workflow
 1. get_activities — List activities for a date range. Returns compact summary by default (9 key fields). Use fields="full" only when you need all metrics. Use this FIRST to obtain activity IDs, then call get_activity_detail or get_activity_streams_summary for deep analysis.

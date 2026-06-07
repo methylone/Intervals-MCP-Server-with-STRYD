@@ -1,45 +1,23 @@
-# Files excluded from the .mcpb bundle.
-# The bundle ships: manifest.json + build/ + node_modules/ (prod only) +
-# package.json + LICENSE + README.md. Everything else is dev/source/infra.
+# .mcpb bundle contents — ALLOWLIST polarity (v0.5.0).
 #
-# IMPORTANT: every pattern is anchored to the bundle root with a leading "/".
-# An UN-anchored pattern like `src/` or `*.md` also matches *inside*
-# node_modules (e.g. node_modules/debug/src/index.js), which silently breaks
-# bundled dependencies at runtime (MODULE_NOT_FOUND). Keep node_modules intact.
+# Why allowlist: the previous exclude-list let any NEW root file ship by default
+# (.pii-forbidden nearly leaked this way at v0.3.2; pii-guard.config.json did get
+# bundled by the old list — caught in the v0.5.0 pack diff). Here we exclude
+# EVERYTHING with `/*`, then re-include only the files the runtime needs. A new
+# root file is now withheld unless explicitly added below — fail-safe.
+#
+# `/*` matches top-level entries only (not nested paths), so re-including a
+# directory with `!` brings its whole subtree along (verified against the mcpb
+# pack engine). Keep node_modules intact: the bundle must ship production deps
+# for the server to start.
 
-# TypeScript sources & tests (the bundle ships compiled build/ only)
-/src/
-/__tests__/
-/tsconfig.json
-/scripts/
+# Exclude every top-level entry…
+/*
 
-# Docs & guidance dirs — keep only the top-level README.md in the bundle
-/docs/
-/training-knowledge-template/
-/*.md
+# …then re-include only what the runtime needs.
+!/build
+!/node_modules
+!/manifest.json
+!/package.json
+!/LICENSE
 !/README.md
-
-# Infra / containers / CI
-/Dockerfile
-/.dockerignore
-/docker-compose.yml
-/.github/
-
-# Secrets & local env (defense in depth; these are also gitignored)
-/.env
-/.env.*
-/cache/
-# PII deny-list (its very contents are the literals we forbid — never bundle it)
-/.pii-forbidden
-
-# Repo / sync / OS cruft
-/.git/
-/.gitignore
-/.stfolder/
-/.DS_Store
-
-# Internal curation list (never public)
-/PUBLIC_MANIFEST.md
-
-# Never nest a bundle inside the bundle
-/*.mcpb

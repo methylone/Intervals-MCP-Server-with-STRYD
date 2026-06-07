@@ -7,7 +7,7 @@
 // root (verifiable: `node build/cli.js` does not transitively import express).
 import { pathToFileURL } from "node:url";
 import { realpathSync } from "node:fs";
-import { TOOLS } from "./tool-registry.js";
+import { getActiveTools } from "./tool-registry.js";
 import { runToolDef } from "./adapters/cli.js";
 
 type CliIo = {
@@ -115,7 +115,9 @@ export async function main(argv: string[], io: CliIo = defaultIo): Promise<numbe
   if (parsed.kind === "list") {
     // Names + descriptions so the catalog is browsable without credentials
     // (the registry is transport-free and needs no auth to enumerate).
-    const tools = TOOLS.map((tool) => ({
+    // getActiveTools() applies READ_ONLY identically to the MCP server, so the
+    // CLI lists exactly the tools the server would register.
+    const tools = getActiveTools().map((tool) => ({
       name: tool.name,
       title: tool.title,
       description: tool.description,
@@ -124,8 +126,9 @@ export async function main(argv: string[], io: CliIo = defaultIo): Promise<numbe
     return 0;
   }
 
-  // parsed.kind === "tool"
-  const tool = TOOLS.find((t) => t.name === parsed.toolName);
+  // parsed.kind === "tool" — only active tools are runnable (READ_ONLY hides the
+  // account-writing tools, so they report "not found" rather than executing).
+  const tool = getActiveTools().find((t) => t.name === parsed.toolName);
   if (!tool) {
     writeMessage(io.stderr, `Tool not found: ${parsed.toolName}`);
     return 1;

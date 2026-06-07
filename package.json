@@ -1,6 +1,6 @@
 {
   "name": "intervals-mcp-with-stryd",
-  "version": "0.4.0",
+  "version": "0.5.0",
   "description": "An Intervals.icu MCP server built for Stryd runners — power-based running analysis (a dual PMC with RSS and LBSS), designed so the LLM never does the math.",
   "license": "AGPL-3.0-or-later",
   "type": "module",
@@ -44,6 +44,7 @@
     "cli": "node --env-file-if-exists=.env build/cli.js",
     "cli:dev": "tsx --env-file .env src/cli.ts",
     "docker:up": "BUILD_SHA=\"$(git rev-parse --short HEAD)$(git diff --quiet || echo -dirty)\" docker compose up -d --build --force-recreate intervals-mcp",
+    "mcpb:pack": "npm run build && npm prune --omit=dev && npx --yes @anthropic-ai/mcpb pack && node scripts/check-mcpb-pii.mjs && shasum -a 256 *.mcpb; echo 'NOTE: devDeps pruned for a clean bundle — run `npm install` to restore them for development.'",
     "prepublishOnly": "npm run clean && npm run build && npm test"
   },
   "engines": {
