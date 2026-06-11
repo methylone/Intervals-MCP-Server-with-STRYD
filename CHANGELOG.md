@@ -22,9 +22,9 @@ All notable changes to this project will be documented in this file.
 
 - **`EXTRA_STREAM_FIELDS`** env var — comma-separated Intervals custom stream codes
   (e.g. `StrydLSS,StrydTemp,StrydHumidity`) fetched and surfaced as `extras` per split
-  and overall in `get_activity_streams_summary`. Requires custom stream mapping in
-  Intervals.icu Settings → Developer → Custom Streams. Backward-compatible: `extras` key
-  is absent when not configured.
+  and overall in `get_activity_streams_summary`. Requires custom stream mapping on an
+  Intervals.icu activity page (CHARTS → CUSTOM STREAMS → ADD STREAM). Backward-compatible:
+  `extras` key is absent when not configured.
 
 - **`run_fraction` + `extras_run`** in `get_activity_streams_summary`.
   `run_fraction`: share of valid samples at or above the run-gate cadence threshold
