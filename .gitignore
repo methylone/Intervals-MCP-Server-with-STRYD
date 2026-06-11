@@ -8,6 +8,11 @@ intervals_api_keys.txt
 # Never committed, never published — its contents are the literals we forbid.
 .pii-forbidden
 
+# CI reverse-estimator regression fixtures = personal training data (real CI
+# labels / flat-power bins). Local-only working files; the regression test
+# skips when absent (describe.skipIf). EXCLUDE from the public repo.
+__tests__/fixtures/ci-reverse/
+
 # Build output / deps / cache
 build/
 node_modules/

@@ -22,7 +22,8 @@ Codex など）には**解釈だけ**を任せます——推測させません�
   フィールドでもコード変更なしに対応できます。詳細は
   [INSTALL.md](INSTALL.md#setting-up-the-stryd-custom-fields-optional) と
   [フィールドレシピ](https://github.com/methylone/Intervals-MCP-Server-with-STRYD/wiki/LLM-Agent-Recipes)
-  を参照。
+  を参照。`estimate_critical_impact` は Stryd API を使わず、Intervals のストリームと Critical Power
+  から Stryd の Critical Impact を逆算するので、LBSS の較正がサーバ内で完結します。
 - **コア（すべての Intervals.icu ユーザ向け）。** アクティビティ、ウェルネス、HRV トレンド、
   イベント／計画ワークアウト（取得＋作成・更新・削除）、アスリートサマリー、ストリーム
   単位の分析（スプリット、心拍デカップリング、勾配補正ペース、カスタムパワー/HR ゾーン）。
@@ -50,7 +51,7 @@ clone もビルドも不要。公開 npm パッケージにクライアントを
 ```json
 {
   "mcpServers": {
-    "intervals": {
+    "intervals-stryd": {
       "command": "npx",
       "args": ["-y", "intervals-mcp-with-stryd"],
       "env": {

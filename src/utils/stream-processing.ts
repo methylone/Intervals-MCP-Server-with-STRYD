@@ -269,6 +269,34 @@ export function avgInRange(
 }
 
 /**
+ * data[startIdx..endIdx] のうち validMask=true かつ非 null の値から
+ * パーセンタイル p（0–100）を nearest-rank 法で返す。
+ * 有効データが 1 件もなければ null。
+ *
+ * nearest-rank: 昇順ソート後、rank = ceil(p/100 × N)（1-based、[1,N] にクランプ）、
+ * 値 = sorted[rank-1]。p=100 で最大値、p→0 で最小値（rank<1 を 1 にクランプ）。
+ * avgInRange と同様、丸めは呼び出し側の責務（生値を返す）。
+ */
+export function percentileInRange(
+  data: (number | null)[],
+  mask: boolean[],
+  start: number,
+  end: number,
+  p: number
+): number | null {
+  const values: number[] = [];
+  for (let i = start; i <= end; i++) {
+    const v = data[i];
+    if (mask[i] && typeof v === "number") values.push(v);
+  }
+  if (values.length === 0) return null;
+  values.sort((a, b) => a - b);
+  const rank = Math.ceil((p / 100) * values.length);
+  const idx = Math.min(Math.max(rank, 1), values.length) - 1;
+  return values[idx];
+}
+
+/**
  * カスタム距離ブレイクポイントで分割する。
  * breakpoints は昇順のメートル値配列。
  * 例: [6000, 12200, 31300] → 4区間: [0-6km, 6-12.2km, 12.2-31.3km, 31.3km-end]
@@ -352,6 +380,60 @@ export function calcDecoupling(
   const h2Ef = h2Metric / h2Hr;
 
   return ((h1Ef - h2Ef) / h1Ef) * 100;
+}
+
+/**
+ * intervals.icu run cadence ストリームの単位係数。
+ * spm = ストリーム値 × RUN_CADENCE_STREAM_TO_SPM。
+ * 2026-06-11 実データ検証（activity i155897558、avg_cadence=86.6）: rpm → 2。
+ * Intervals.icu の average_cadence（=87.1）と一致 → ストリームは rpm（片足）。
+ */
+export const RUN_CADENCE_STREAM_TO_SPM = 2;
+
+/**
+ * ストライド長 (m/step) = velocity / (spm / 60)。
+ * Garmin の "stride length"（1歩あたり距離）と同義。
+ * spm はヘルパ内で RUN_CADENCE_STREAM_TO_SPM を適用して得る。
+ * avgVelocityMs / avgCadenceStream のどちらかが null または <= 0 なら null。
+ */
+export function strideLengthM(
+  avgVelocityMs: number | null,
+  avgCadenceStream: number | null,
+): number | null {
+  if (avgVelocityMs === null || avgCadenceStream === null) return null;
+  if (avgVelocityMs <= 0 || avgCadenceStream <= 0) return null;
+  const spm = avgCadenceStream * RUN_CADENCE_STREAM_TO_SPM;
+  return avgVelocityMs / (spm / 60);
+}
+
+/** run 判定の cadence 閾値デフォルト（rpm・片足）。70 rpm = 140 spm。
+ *  歩行 ≈50–60 rpm、ウルトラのシャッフル走 ≈72–78 rpm の間を分離する値。 */
+export const DEFAULT_RUN_GATE_CADENCE_RPM = 70;
+
+/**
+ * 走行サンプルマスクを合成する。
+ * runMask[i] = validMask[i] && cadence[i] is a number >= thresholdRpm
+ * 定義より runMask ⊆ validMask。スムージング・ヒステリシスは行わない。
+ */
+export function buildRunMask(
+  validMask: boolean[],
+  cadence: (number | null)[],
+  thresholdRpm: number,
+): boolean[] {
+  return validMask.map((valid, i) => {
+    if (!valid) return false;
+    const c = cadence[i];
+    return typeof c === "number" && c >= thresholdRpm;
+  });
+}
+
+/** mask[start..end] の true の個数（start, end ともに inclusive）。 */
+export function countInRange(mask: boolean[], start: number, end: number): number {
+  let count = 0;
+  for (let i = start; i <= end; i++) {
+    if (mask[i]) count++;
+  }
+  return count;
 }
 
 /**

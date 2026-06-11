@@ -1,6 +1,8 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 import { z } from "zod";
+import { config_ } from "../../config.js";
 import { intervalsClient } from "../intervals-client.js";
+import { SUMMARY_STREAM_TYPES } from "../stream-types.js";
 import type { ToolDef, ToolContext } from "../../tool-registry.js";
 import {
   streamsToMap,
@@ -10,22 +12,15 @@ import {
   splitByDistance,
   splitByBreakpoints,
   avgInRange,
+  percentileInRange,
   velocityToPace,
   calcDecoupling,
   calcZoneTimes,
+  strideLengthM,
+  buildRunMask,
+  countInRange,
+  DEFAULT_RUN_GATE_CADENCE_RPM,
 } from "../../utils/stream-processing.js";
-
-const STREAMS_SUMMARY_TYPES = [
-  "time",
-  "fixed_heartrate",
-  "velocity_smooth",
-  "distance",
-  "ga_velocity",
-  "fixed_watts",
-  "grade_smooth",
-  // "temp" — device temp excluded; weather data comes from activity-level fields
-  "cadence",
-] as const;
 
 type SplitMethod = "halves" | "thirds" | "quarters" | "km" | "custom" | "segments";
 
@@ -72,7 +67,22 @@ export const getStreamsSummaryTool: ToolDef = {
   title: "Get Activity Streams Summary",
   description:
     "Fetch activity stream data, clean/split/aggregate, and return a summary with splits, " +
-    "cardiac decoupling, and efficiency metrics.",
+    "cardiac decoupling, and efficiency metrics. " +
+    "Each split and the overall block also carry avg_ilr and ilr_p95 (from the configured ILR field): " +
+    "avg flags walk/soft-surface dilution, p95 captures the impact tail (eccentric loading) per segment. " +
+    "Each split and overall include avg_stride_length_m (meters per step, derived as speed / step rate) — " +
+    "use together with avg_cadence to decompose pace changes into cadence vs stride-length components. " +
+    "When EXTRA_STREAM_FIELDS is configured, each split and overall also carry an extras record with per-split " +
+    "averages for those Intervals custom streams (e.g. StrydLSS, StrydTemp, StrydHumidity). " +
+    "Note: StrydTemp is foot-mounted and reads several degrees C above ambient — use for relative " +
+    "within-run / run-to-run comparison, not absolute values. It is a different sensor from the native " +
+    "temp stream; do not mix the two. " +
+    "When cadence data is present, each split and overall also include run_fraction (share of valid samples " +
+    "above the run-gate cadence threshold) and, when extras are configured, extras_run (extras averages " +
+    "restricted to running samples only). Core averages (avg_cadence, avg_stride_length_m, etc.) " +
+    "intentionally include the walk/run mix — pace decomposition analysis uses the full mix. " +
+    "For stiffness metrics like StrydLSS, read extras_run to separate per-stride change from walk-mix " +
+    "dilution; compare run_fraction across splits to see gait-mix drift.",
   schema: {
     activity_id: z
           .string()
@@ -136,8 +146,18 @@ export const getStreamsSummaryTool: ToolDef = {
             "Example: [131, 139, 146, 155] creates 5 zones: <131, 131-139, 139-146, 146-155, >155. " +
             "If omitted, custom HR zone analysis is skipped."
           ),
+        run_gate_cadence_rpm: z
+          .number()
+          .min(40)
+          .max(120)
+          .default(DEFAULT_RUN_GATE_CADENCE_RPM)
+          .describe(
+            "Cadence threshold (rpm, one-foot) used to gate running samples for run_fraction and extras_run. " +
+            "70 rpm = 140 spm (default). Increase to tighten the run gate (exclude slow shuffles); " +
+            "decrease to loosen it. Requires cadence stream to have any effect."
+          ),
   },
-  handler: async ({ activity_id, split_method, split_breakpoints_m, segment_count, warmup_exclude_sec, post_stop_buffer_sec, power_zone_boundaries, hr_zone_boundaries }: {
+  handler: async ({ activity_id, split_method, split_breakpoints_m, segment_count, warmup_exclude_sec, post_stop_buffer_sec, power_zone_boundaries, hr_zone_boundaries, run_gate_cadence_rpm }: {
       activity_id: string;
       split_method: "auto" | "halves" | "thirds" | "quarters" | "km" | "custom" | "segments";
       split_breakpoints_m?: number[];
@@ -146,16 +166,28 @@ export const getStreamsSummaryTool: ToolDef = {
       post_stop_buffer_sec: number;
       power_zone_boundaries?: number[];
       hr_zone_boundaries?: number[];
+      run_gate_cadence_rpm: number;
     }, ctx?: ToolContext) => {
       // Defaults applied by the adapter's parseAsync (warmup=600, post_stop=30, split_method="auto").
       const warmupExcludeSec = warmup_exclude_sec;
       const postStopBufferSec = post_stop_buffer_sec;
       const splitMethodParam = split_method;
       const splitBreakpointsM = split_breakpoints_m;
+      // Zod .default() is not applied when the handler is called directly (e.g. in tests).
+      const runGateCadenceRpm = run_gate_cadence_rpm ?? DEFAULT_RUN_GATE_CADENCE_RPM;
+
+      // Read the configured ILR field name here (handler), NOT at module load —
+      // config_ is a lazy Proxy and reading it at import time would break the
+      // credential-free paths. The ILR field is appended to requiredTypes; the
+      // fetch already pulls the canonical superset (which includes it), so the
+      // v2 cache entry stays a hit (requiredTypes ⊆ recorded request set).
+      const ilrField = config_.ilrField;
+      // Extra custom stream codes (same lazy discipline as ilrField above).
+      const extraStreamFields = config_.extraStreamFields;
 
       // Stage 1: Fetch streams and activity name in parallel
       const [streams, activityRaw] = await Promise.all([
-        intervalsClient.getActivityStreams(activity_id, [...STREAMS_SUMMARY_TYPES], { signal: ctx?.signal }),
+        intervalsClient.getActivityStreams(activity_id, [...SUMMARY_STREAM_TYPES, ilrField, ...extraStreamFields], { signal: ctx?.signal }),
         intervalsClient.getActivityDetail(activity_id, { signal: ctx?.signal }),
       ]);
 
@@ -177,11 +209,21 @@ export const getStreamsSummaryTool: ToolDef = {
       const watts = streamMap.get("fixed_watts") ?? [];
       const cadence = streamMap.get("cadence") ?? [];
       const gradeSmooth = streamMap.get("grade_smooth") ?? new Array(time.length).fill(null);
+      const ilr = streamMap.get(ilrField) ?? new Array(time.length).fill(null);
+      // Extra custom streams: Map<code, data[]>. Only populated when configured.
+      const extraStreams = new Map<string, (number | null)[]>(
+        extraStreamFields.map((code) => [
+          code,
+          streamMap.get(code) ?? new Array(time.length).fill(null),
+        ]),
+      );
 
       // Detect optional stream availability
       const hasGap = gaVelocity.some((v) => v !== null);
       const hasPower = watts.some((v) => v !== null);
       const hasGrade = streamMap.has("grade_smooth");
+      const hasIlr = streamMap.has(ilrField);
+      const hasCadence = cadence.some((v) => v !== null);
 
       // Stage 2: Build valid mask (stop detection + warmup exclusion)
       const maskResult = buildValidMask(time, velocity, {
@@ -189,6 +231,11 @@ export const getStreamsSummaryTool: ToolDef = {
         postStopBufferSec: postStopBufferSec,
       });
       const { validMask, timeGaps, stopSegments, stoppedTimeSec, bufferTimeSec } = maskResult;
+      // Run-gate mask: subset of validMask where cadence >= threshold.
+      // Only built when cadence stream has data; otherwise null (no gate features emitted).
+      const runMask = hasCadence
+        ? buildRunMask(validMask, cadence, runGateCadenceRpm)
+        : null;
 
       // Stage 3 & 4: Compute timing metrics
       const totalElapsedSec = time[time.length - 1] - time[0];
@@ -231,6 +278,8 @@ export const getStreamsSummaryTool: ToolDef = {
         const avgPower = hasPower ? avgInRange(watts, validMask, startIdx, endIdx) : null;
         const avgCad = avgInRange(cadence, validMask, startIdx, endIdx);
         const avgGrade = hasGrade ? avgInRange(gradeSmooth, validMask, startIdx, endIdx) : null;
+        const avgIlr = hasIlr ? avgInRange(ilr, validMask, startIdx, endIdx) : null;
+        const ilrP95 = hasIlr ? percentileInRange(ilr, validMask, startIdx, endIdx, 95) : null;
 
         const paceSec = avgVel !== null && avgVel > 0 ? velocityToPace(avgVel) : null;
         const gapPaceSec = avgGapVel !== null && avgGapVel > 0 ? velocityToPace(avgGapVel) : null;
@@ -257,6 +306,41 @@ export const getStreamsSummaryTool: ToolDef = {
         const splitDistanceM =
           startDist !== null && endDist !== null ? (endDist as number) - (startDist as number) : 0;
 
+        // Compute per-split averages for extra custom streams (omit key entirely
+        // when no extras are configured to keep output backward-compatible).
+        const extrasEntry =
+          extraStreamFields.length > 0
+            ? Object.fromEntries(
+                extraStreamFields.map((code) => {
+                  const raw = avgInRange(extraStreams.get(code)!, validMask, startIdx, endIdx);
+                  return [code, raw !== null ? Math.round(raw * 100) / 100 : null];
+                }),
+              )
+            : undefined;
+
+        // run_fraction: share of valid samples above run-gate cadence threshold.
+        const validCount = countInRange(validMask, startIdx, endIdx);
+        const runCount = runMask ? countInRange(runMask, startIdx, endIdx) : null;
+        const runFractionSplit =
+          runMask !== null
+            ? validCount > 0
+              ? Math.round((runCount! / validCount) * 100) / 100
+              : null
+            : undefined;
+
+        // extras_run: extras averages restricted to running samples only.
+        // Suppress (all null) for splits with < 60 run samples to avoid noisy averages.
+        const extrasRunEntry =
+          runMask !== null && extraStreamFields.length > 0
+            ? Object.fromEntries(
+                extraStreamFields.map((code) => {
+                  if (runCount! < 60) return [code, null];
+                  const raw = avgInRange(extraStreams.get(code)!, runMask, startIdx, endIdx);
+                  return [code, raw !== null ? Math.round(raw * 100) / 100 : null];
+                }),
+              )
+            : undefined;
+
         return {
           label: resolvedMethod === "custom"
             ? customSplitLabel(splitBreakpointsM!, idx)
@@ -273,11 +357,24 @@ export const getStreamsSummaryTool: ToolDef = {
             : null,
           avg_cadence:
             avgCad !== null ? Math.round(avgCad * 10) / 10 : null,
+          avg_stride_length_m: (() => {
+            const sl = strideLengthM(avgVel, avgCad);
+            return sl !== null ? Math.round(sl * 100) / 100 : null;
+          })(),
           avg_grade: hasGrade
             ? avgGrade !== null ? Math.round(avgGrade * 100) / 100 : null
             : null,
+          avg_ilr: hasIlr
+            ? avgIlr !== null ? Math.round(avgIlr * 100) / 100 : null
+            : null,
+          ilr_p95: hasIlr
+            ? ilrP95 !== null ? Math.round(ilrP95 * 100) / 100 : null
+            : null,
           ef_pace: efPace !== null ? Math.round(efPace * 10000) / 10000 : 0,
           ef_power: hasPower && efPower !== null ? Math.round(efPower * 100) / 100 : null,
+          ...(runFractionSplit !== undefined ? { run_fraction: runFractionSplit } : {}),
+          ...(extrasEntry !== undefined ? { extras: extrasEntry } : {}),
+          ...(extrasRunEntry !== undefined ? { extras_run: extrasRunEntry } : {}),
         };
       });
 
@@ -295,6 +392,42 @@ export const getStreamsSummaryTool: ToolDef = {
       const overallAvgPower = hasPower ? avgInRange(watts, validMask, overallStart, overallEnd) : null;
       const overallAvgCad = avgInRange(cadence, validMask, overallStart, overallEnd);
       const overallAvgGrade = hasGrade ? avgInRange(gradeSmooth, validMask, overallStart, overallEnd) : null;
+      const overallAvgIlr = hasIlr ? avgInRange(ilr, validMask, overallStart, overallEnd) : null;
+      const overallIlrP95 = hasIlr ? percentileInRange(ilr, validMask, overallStart, overallEnd, 95) : null;
+      const overallExtras =
+        extraStreamFields.length > 0
+          ? Object.fromEntries(
+              extraStreamFields.map((code) => {
+                const raw = avgInRange(extraStreams.get(code)!, validMask, overallStart, overallEnd);
+                return [code, raw !== null ? Math.round(raw * 100) / 100 : null];
+              }),
+            )
+          : undefined;
+      // Which of the configured extra codes are actually present in the response.
+      const extraStreamsPresent =
+        extraStreamFields.length > 0
+          ? extraStreamFields.filter((code) => streamMap.has(code))
+          : undefined;
+
+      // Overall run_fraction and extras_run.
+      const overallValidCount = countInRange(validMask, overallStart, overallEnd);
+      const overallRunCount = runMask ? countInRange(runMask, overallStart, overallEnd) : null;
+      const overallRunFraction =
+        runMask !== null
+          ? overallValidCount > 0
+            ? Math.round((overallRunCount! / overallValidCount) * 100) / 100
+            : null
+          : undefined;
+      const overallExtrasRun =
+        runMask !== null && extraStreamFields.length > 0
+          ? Object.fromEntries(
+              extraStreamFields.map((code) => {
+                if (overallRunCount! < 60) return [code, null];
+                const raw = avgInRange(extraStreams.get(code)!, runMask, overallStart, overallEnd);
+                return [code, raw !== null ? Math.round(raw * 100) / 100 : null];
+              }),
+            )
+          : undefined;
 
       const overallPaceSec = overallAvgVel !== null && overallAvgVel > 0
         ? velocityToPace(overallAvgVel)
@@ -392,13 +525,26 @@ export const getStreamsSummaryTool: ToolDef = {
             ? overallAvgPower !== null ? Math.round(overallAvgPower) : null
             : null,
           avg_cadence: overallAvgCad !== null ? Math.round(overallAvgCad * 10) / 10 : null,
+          avg_stride_length_m: (() => {
+            const sl = strideLengthM(overallAvgVel, overallAvgCad);
+            return sl !== null ? Math.round(sl * 100) / 100 : null;
+          })(),
           avg_grade: hasGrade
             ? overallAvgGrade !== null ? Math.round(overallAvgGrade * 100) / 100 : null
+            : null,
+          avg_ilr: hasIlr
+            ? overallAvgIlr !== null ? Math.round(overallAvgIlr * 100) / 100 : null
+            : null,
+          ilr_p95: hasIlr
+            ? overallIlrP95 !== null ? Math.round(overallIlrP95 * 100) / 100 : null
             : null,
           ef_pace: overallEfPace !== null ? Math.round(overallEfPace * 10000) / 10000 : null,
           ef_power: hasPower && overallEfPower !== null
             ? Math.round(overallEfPower * 100) / 100
             : null,
+          ...(overallRunFraction !== undefined ? { run_fraction: overallRunFraction } : {}),
+          ...(overallExtras !== undefined ? { extras: overallExtras } : {}),
+          ...(overallExtrasRun !== undefined ? { extras_run: overallExtrasRun } : {}),
         },
 
         split_method: resolvedMethod,
@@ -421,7 +567,10 @@ export const getStreamsSummaryTool: ToolDef = {
           has_power: hasPower,
           has_gap: hasGap,
           has_grade: hasGrade,
+          has_ilr: hasIlr,
           has_weather: hasWeather,
+          ...(extraStreamsPresent !== undefined ? { extra_streams_present: extraStreamsPresent } : {}),
+          ...(runMask !== null ? { run_gate_cadence_rpm: runGateCadenceRpm } : {}),
         },
       };
 

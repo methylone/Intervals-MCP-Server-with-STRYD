@@ -20,7 +20,7 @@ import { config_, FIELD_NAME_REGEX } from "../../../config.js";
 import { intervalsClient } from "../../../core/intervals-client.js";
 import type { Activity, Wellness } from "../../../core/types.js";
 import { addDays } from "../../../utils/date.js";
-import { readNumericField } from "../../../utils/field-access.js";
+import { readNumericField, resolveEccField } from "../../../utils/field-access.js";
 import { computeLbssPmc } from "../lbss-calculator.js";
 
 /** LBSS EMA の cold-start バイアスを 1% 未満に抑える助走期間（日数）*/
@@ -60,6 +60,9 @@ export const getPhaseSummaryTool: ToolDef = {
     "- trends: weekly RSS/LBSS series and CTL ramp rate (avg weekly CTL change)\n" +
     "LBSS is read from the configured custom field (env LBSS_FIELD, default StrydLBSSv2); " +
     "override per-call with lbss_field (to compare fields, call twice with different lbss_field).\n" +
+    "Set include_ecc=true to also report eccentric LBSS (env ECC_FIELD, default EccLBSS) as a " +
+    "weekly total (weeks[].totals.ecc, phase_totals.ecc) and a trends.ecc_weekly series. " +
+    "No Ecc-PMC/CTL is computed (a retroactive-CI artifact).\n" +
     "Note: start_date must be a Monday, end_date must be a Sunday. " +
     "LBSS values require Stryd data synced to Intervals (post Nov 2025).",
   schema: {
@@ -83,15 +86,26 @@ export const getPhaseSummaryTool: ToolDef = {
         'Override the LBSS custom-field name for this call ' +
         '(e.g. "StrydLBSSv2", "StrydLBSSmod"). Defaults to env LBSS_FIELD.',
       ),
+    include_ecc: z
+      .boolean()
+      .optional()
+      .describe(
+        "When true, also report eccentric LBSS (env ECC_FIELD, default EccLBSS) as a " +
+        "weekly total (weeks[].totals.ecc, phase_totals.ecc) and trends.ecc_weekly. " +
+        "Errors if ECC_FIELD is disabled (empty).",
+      ),
   },
-  handler: async ({ start_date: startDate, end_date: endDate, phase_name: phaseName, lbss_field }: {
+  handler: async ({ start_date: startDate, end_date: endDate, phase_name: phaseName, lbss_field, include_ecc }: {
     start_date: string;
     end_date: string;
     phase_name?: string;
     lbss_field?: string;
+    include_ecc?: boolean;
   }, ctx?: ToolContext) => {
       const lbssField = lbss_field ?? config_.lbssField;
       const ilrField = config_.ilrField;
+      const withEcc = include_ecc ?? false;
+      const eccField = withEcc ? resolveEccField(config_.eccField) : "";
       const warmupStart = addDays(startDate, -WARMUP_DAYS);
 
       // API 呼び出しは2回のみ（並列）
@@ -144,6 +158,12 @@ export const getPhaseSummaryTool: ToolDef = {
             weekActivities.reduce((s, a) => s + (readNumericField(a, lbssField) ?? 0), 0),
             1,
           ),
+          ...(withEcc ? {
+            ecc: round(
+              weekActivities.reduce((s, a) => s + (readNumericField(a, eccField) ?? 0), 0),
+              1,
+            ),
+          } : {}),
           time_min: Math.round(
             weekActivities.reduce((s, a) => s + a.moving_time, 0) / 60,
           ),
@@ -213,6 +233,12 @@ export const getPhaseSummaryTool: ToolDef = {
           phaseActivities.reduce((s, a) => s + (readNumericField(a, lbssField) ?? 0), 0),
           1,
         ),
+        ...(withEcc ? {
+          ecc: round(
+            phaseActivities.reduce((s, a) => s + (readNumericField(a, eccField) ?? 0), 0),
+            1,
+          ),
+        } : {}),
         time_min: Math.round(
           phaseActivities.reduce((s, a) => s + a.moving_time, 0) / 60,
         ),
@@ -226,6 +252,9 @@ export const getPhaseSummaryTool: ToolDef = {
       // ── トレンド ─────────────────────────────────────────────────────────────
       const rss_weekly = weeks.map((w) => w.totals.rss ?? 0);
       const lbss_weekly = weeks.map((w) => w.totals.lbss ?? 0);
+      const ecc_weekly = withEcc
+        ? weeks.map((w) => (w.totals as { ecc?: number | null }).ecc ?? 0)
+        : undefined;
       const rss_ctl_series = weeks.map((w) => w.pmc_end_of_week.rss.ctl ?? 0);
       const lbss_ctl_series = weeks.map((w) => w.pmc_end_of_week.lbss.ctl ?? 0);
 
@@ -254,6 +283,7 @@ export const getPhaseSummaryTool: ToolDef = {
         trends: {
           rss_weekly,
           lbss_weekly,
+          ...(ecc_weekly ? { ecc_weekly } : {}),
           rss_ctl_series,
           lbss_ctl_series,
           rss_ramp_rate,

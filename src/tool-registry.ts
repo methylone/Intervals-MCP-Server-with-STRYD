@@ -23,11 +23,17 @@ import { updateEventTool } from "./core/tools/update-event.js";
 import { deleteEventTool } from "./core/tools/delete-event.js";
 import { deleteEventsTool } from "./core/tools/delete-events.js";
 import { getHrvTrendsTool } from "./core/tools/get-hrv-trends.js";
+import { listGearTool } from "./core/tools/list-gear.js";
+import { assignGearTool } from "./core/tools/assign-gear.js";
+import { createGearTool } from "./core/tools/create-gear.js";
+import { retireGearTool } from "./core/tools/retire-gear.js";
 import { clearCacheTool } from "./core/tools/clear-cache.js";
 import { setCacheEnabledTool } from "./core/tools/set-cache-enabled.js";
 import { getCurrentPmcTool } from "./extensions/stryd/tools/get-current-pmc.js";
 import { getWeeklySummaryTool } from "./extensions/stryd/tools/get-weekly-summary.js";
 import { getPhaseSummaryTool } from "./extensions/stryd/tools/get-phase-summary.js";
+import { estimateCriticalImpactTool } from "./extensions/stryd/tools/estimate-critical-impact.js";
+import { updateLbssCiTableTool } from "./extensions/stryd/tools/update-lbss-ci-table.js";
 
 export interface ToolDef {
   name: string;
@@ -38,9 +44,9 @@ export interface ToolDef {
   /** Returns raw data on success; throws on hard failure. */
   handler: (args: any, context?: ToolContext) => Promise<unknown>;
   /**
-   * True for tools that write to the Intervals.icu account (calendar events).
-   * READ_ONLY mode withholds these. Tools with only local side effects
-   * (clear_cache / set_cache_enabled) are NOT marked and stay available.
+   * True for tools that write to the Intervals.icu account (calendar events,
+   * gear assignment). READ_ONLY mode withholds these. Tools with only local
+   * side effects (clear_cache / set_cache_enabled) are NOT marked and stay available.
    */
   writesAccount?: boolean;
 }
@@ -63,12 +69,18 @@ export const TOOLS: ToolDef[] = [
   deleteEventTool,
   deleteEventsTool,
   getHrvTrendsTool,
+  listGearTool,
+  assignGearTool,
+  createGearTool,
+  retireGearTool,
   clearCacheTool,
   setCacheEnabledTool,
   // Stryd extensions
   getCurrentPmcTool,
   getWeeklySummaryTool,
   getPhaseSummaryTool,
+  estimateCriticalImpactTool,
+  updateLbssCiTableTool,
 ];
 
 /**

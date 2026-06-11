@@ -8,8 +8,11 @@ import {
   splitByDistance,
   splitByBreakpoints,
   avgInRange,
+  percentileInRange,
   calcDecoupling,
   calcZoneTimes,
+  strideLengthM,
+  RUN_CADENCE_STREAM_TO_SPM,
 } from "../src/utils/stream-processing.js";
 
 // ─── buildValidMask ───────────────────────────────────────────────────────────
@@ -364,6 +367,46 @@ describe("avgInRange", () => {
   });
 });
 
+// ─── percentileInRange ──────────────────────────────────────────────────────────
+
+describe("percentileInRange", () => {
+  const allTrue = (n: number) => new Array(n).fill(true);
+
+  it("p95 nearest-rank of 1..10 = 10 (ceil(0.95*10)=10th)", () => {
+    const data = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10];
+    expect(percentileInRange(data, allTrue(10), 0, 9, 95)).toBe(10);
+  });
+
+  it("p50 nearest-rank of 1..10 = 5 (ceil(0.5*10)=5th)", () => {
+    const data = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10];
+    expect(percentileInRange(data, allTrue(10), 0, 9, 50)).toBe(5);
+  });
+
+  it("p100 = max, low p clamps to the min (rank≥1)", () => {
+    const data = [4, 1, 7, 3];
+    expect(percentileInRange(data, allTrue(4), 0, 3, 100)).toBe(7);
+    expect(percentileInRange(data, allTrue(4), 0, 3, 0)).toBe(1); // rank=ceil(0)=0 → clamp to 1
+  });
+
+  it("ignores masked-out and null values, sorts the rest", () => {
+    const data: (number | null)[] = [100, null, 5, 9, 1];
+    const mask = [false, true, true, true, true]; // drop the 100
+    // valid values {5,9,1} sorted [1,5,9]; p95 → ceil(0.95*3)=3 → 9
+    expect(percentileInRange(data, mask, 0, 4, 95)).toBe(9);
+  });
+
+  it("single valid value returns that value for any p", () => {
+    expect(percentileInRange([42], [true], 0, 0, 95)).toBe(42);
+    expect(percentileInRange([42], [true], 0, 0, 10)).toBe(42);
+  });
+
+  it("empty / all-null / all-masked → null", () => {
+    expect(percentileInRange([], [], 0, 0, 95)).toBeNull();
+    expect(percentileInRange([null, null], allTrue(2), 0, 1, 95)).toBeNull();
+    expect(percentileInRange([1, 2], [false, false], 0, 1, 95)).toBeNull();
+  });
+});
+
 // ─── calcDecoupling ───────────────────────────────────────────────────────────
 
 describe("calcDecoupling", () => {
@@ -512,5 +555,32 @@ describe("calcZoneTimes", () => {
     const { zones, totalClassifiedSecs } = calcZoneTimes(time, values, validMask, [100]);
     expect(zones).toEqual([0, 0]);
     expect(totalClassifiedSecs).toBe(0);
+  });
+});
+
+// ─── strideLengthM ───────────────────────────────────────────────────────────
+
+describe("strideLengthM", () => {
+  it("係数は 2（rpm → spm）", () => {
+    expect(RUN_CADENCE_STREAM_TO_SPM).toBe(2);
+  });
+
+  it("典型値: avgVelocityMs=3.333、cadenceStream=86 (spm=172) → ~1.16", () => {
+    // 3.333 / (86 * 2 / 60) = 3.333 / 2.8667 = 1.1627
+    const result = strideLengthM(3.333, 86);
+    expect(result).not.toBeNull();
+    expect(result!).toBeCloseTo(1.16, 1);
+  });
+
+  it("avgCadenceStream = null → null", () => {
+    expect(strideLengthM(3.333, null)).toBeNull();
+  });
+
+  it("avgCadenceStream = 0 → null", () => {
+    expect(strideLengthM(3.333, 0)).toBeNull();
+  });
+
+  it("avgVelocityMs = null → null", () => {
+    expect(strideLengthM(null, 86)).toBeNull();
   });
 });

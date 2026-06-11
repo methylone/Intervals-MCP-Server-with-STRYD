@@ -16,10 +16,13 @@ into an AI assistant and have it do the setup for you (see
 - **Your athlete ID**: visible in the Intervals.icu URL when viewing your own
   calendar/profile (a short string like `i12345678`). You can also set the athlete
   ID to `0`, which means "the owner of this API key".
-- **(Optional) Stryd extension.** The `get_current_pmc`, `get_weekly_summary`, and
-  `get_phase_summary` tools use Stryd load metrics (LBSS / ILR). These require a
-  Stryd power meter **and** three Intervals.icu custom fields — see
+- **(Optional) Stryd extension.** The `get_current_pmc`, `get_weekly_summary`,
+  `get_phase_summary`, and `estimate_critical_impact` tools use Stryd load metrics
+  (LBSS / ILR). These require a Stryd power meter **and** a small set of Intervals.icu
+  custom fields (at minimum an LBSS field plus `StrydILR`) — see
   [Setting up the Stryd custom fields](#setting-up-the-stryd-custom-fields-optional).
+  (`estimate_critical_impact` reverse-estimates Stryd's Critical Impact from your
+  streams + Critical Power, with no Stryd API.)
   **The core tools work without Stryd** — the extension simply adds power-based PMC on top.
 - **(Optional) Weather metric.** The `average_feels_like` value used by
   `search_similar_activities` comes from Open-Meteo enrichment in Intervals.icu;
@@ -49,7 +52,7 @@ published npm package directly — no clone, no build:
 ```json
 {
   "mcpServers": {
-    "intervals": {
+    "intervals-stryd": {
       "command": "npx",
       "args": ["-y", "intervals-mcp-with-stryd"],
       "env": {
@@ -72,6 +75,13 @@ always fetched live.) The npm package also installs an `intervals-mcp` CLI on yo
 
 For the Stryd extension, add the custom fields in
 [Setting up the Stryd custom fields](#setting-up-the-stryd-custom-fields-optional).
+
+> **Upgrading from ≤ 0.10.0?** The tool namespace is now **`intervals-stryd`** for every
+> install method (it was `intervals` for command-based configs and `Intervals MCP with
+> STRYD` for the MCPB bundle). Command-config users: rename the `mcpServers` key from
+> `intervals` to `intervals-stryd`. MCPB users: the new namespace applies automatically
+> after updating. Client-side memory keyed on the old namespace won't carry over — a
+> one-time reset is expected.
 
 ## Install from source (development / HTTP / Docker)
 
@@ -130,32 +140,31 @@ All optional variables are documented in `.env.example`. Two worth calling out:
   `lbss_field` override, and `include_legacy=true` reports `LBSS_FIELD_LEGACY` alongside.
   **v0.6.0 changed the LBSS default `StrydLBSSmod` → `StrydLBSSv2`** — if your account only
   has the community `StrydLBSSmod` field, either build `StrydLBSSv2` from the
-  [field recipes](https://github.com/methylone/Intervals-MCP-Server-with-STRYD/wiki/LLM-Agent-Recipes)
+  [field setup guide](https://github.com/methylone/Intervals-MCP-Server-with-STRYD/wiki/Stryd-LBSS-v2-Field-Setup)
   or set `LBSS_FIELD=StrydLBSSmod` to restore the previous behavior.
 
 ### Setting up the Stryd custom fields (optional)
 
-The Stryd extension reads three Intervals.icu **custom activity fields**. These are
-community-shared fields you add to your own account — they are not built in. To enable them:
+The Stryd extension reads Intervals.icu **custom activity fields**. These are
+community-shared (or self-built) fields you add to your own account — they are not built
+in. At minimum you need **`StrydILR`** and one **LBSS field**; the rest are optional.
+To add them:
 
-1. In Intervals.icu, go to **Settings → Sports Settings → Run → Custom Fields →
-   Activity fields**.
-2. Use the search box to find and add each of these three fields:
+1. In Intervals.icu, go to **Settings → Sport Settings → RUN → CUSTOM FIELDS** (button),
+   which opens the **Activity Fields** dialog. There you can **ADD FIELD** to create a new
+   field, or use the magnifier **FIELD** search to add a community-shared one. (When
+   creating or editing a field, the **TYPE / DESCRIPTION / SCRIPT** tabs define it; decimal
+   places are set under **Format**, e.g. `.1f` — there is no separate "Decimals" box.)
 
-   | Display name | Field code (read by this server) | Shared by |
+2. Add the fields below. **`StrydILR` and one LBSS field are required**; the rest are
+   optional:
+
+   | Field code (read by this server) | Required? | What it is / how to get it |
    |---|---|---|
-   | Stryd LBSS mod | `StrydLBSSmod` | miguell |
-   | Stryd ILR | `StrydILR` | Knuefi |
-   | Stryd ILR @Treshold | `StrydILRTreshold` | miguell |
-
-   `StrydILR` / `StrydILRTreshold` add the Impact Loading Rate metrics. The field codes —
-   **including the `Treshold` spelling** — must match exactly; that is the real field name.
-
-   These are the community-shared fields. Note the LBSS-based PMC now defaults to
-   **`StrydLBSSv2`** (a Stryd-faithful recalibration, env `LBSS_FIELD`), which is not in
-   the community search box — build it from the
-   [field recipes](https://github.com/methylone/Intervals-MCP-Server-with-STRYD/wiki/LLM-Agent-Recipes),
-   or set `LBSS_FIELD=StrydLBSSmod` to keep using the community `StrydLBSSmod` field above.
+   | `StrydLBSSv2` *or* `StrydLBSSmod` | **Required** (one LBSS field) | Lower Body Stress Score — the LBSS-based PMC depends on it. `StrydLBSSv2` is a Stryd-faithful recalibration **not in the community search**; build it from the [field setup guide](https://github.com/methylone/Intervals-MCP-Server-with-STRYD/wiki/Stryd-LBSS-v2-Field-Setup). The community `StrydLBSSmod` (shared by *miguell*) is searchable — set `LBSS_FIELD=StrydLBSSmod` to use it. |
+   | `StrydILR` | **Required** | Impact Loading Rate. Community-shared (by *Knuefi*) — add via the **FIELD** search. |
+   | `StrydILRTreshold` | Optional | ILR @ threshold. Community-shared (by *miguell*); **not consumed by this server** (it powers the in-app ILR view). The code — **including the `Treshold` spelling** — must match exactly, and it relies on an "ILR@CP Calculator" custom field (see that field's own description in Intervals.icu). |
+   | `EccLBSS` | Optional | Eccentric (downhill) LBSS. **Not consumed by this server**; covered in the [field setup guide](https://github.com/methylone/Intervals-MCP-Server-with-STRYD/wiki/Stryd-LBSS-v2-Field-Setup) for separate downhill/eccentric analysis. |
 
 3. Once added, these values are copied onto **new Run activities**, so `get_current_pmc`,
    `get_weekly_summary`, `get_phase_summary`, and the ILR fields in `get_activity_detail`
@@ -165,9 +174,6 @@ community-shared fields you add to your own account — they are not built in. T
 data is only available from around **November 2025** onward, so older activities won't have
 it regardless; for activities within that range you can backfill the values by re-processing
 them in Intervals.icu.
-
-> `Stryd ILR @Treshold` additionally relies on an "ILR@CP Calculator" custom field to be set
-> correctly — see that field's own description in Intervals.icu.
 
 ## Connecting a client
 
@@ -182,7 +188,7 @@ Edit your `claude_desktop_config.json`
 ```json
 {
   "mcpServers": {
-    "intervals": {
+    "intervals-stryd": {
       "command": "node",
       "args": ["/absolute/path/to/intervals-mcp-server/build/index.js"],
       "env": {
@@ -195,7 +201,7 @@ Edit your `claude_desktop_config.json`
 }
 ```
 
-Restart Claude Desktop; the `intervals` tools should appear.
+Restart Claude Desktop; the `intervals-stryd` tools should appear.
 
 ### Codex CLI — stdio
 
@@ -239,7 +245,7 @@ Claude Desktop does not connect to HTTP MCP servers directly; bridge it with
 ```json
 {
   "mcpServers": {
-    "intervals": {
+    "intervals-stryd": {
       "command": "npx",
       "args": ["mcp-remote", "http://<server-host-on-your-vpn>:8080/mcp", "--allow-http"]
     }

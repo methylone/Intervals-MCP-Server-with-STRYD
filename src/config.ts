@@ -87,14 +87,24 @@ const envSchema = z.object({
     .string()
     .regex(FIELD_NAME_REGEX, `LBSS_FIELD ${FIELD_NAME_ERROR}`)
     .default("StrydLBSSv2"),
-  LBSS_FIELD_LEGACY: z
-    .string()
-    .regex(FIELD_NAME_REGEX, `LBSS_FIELD_LEGACY ${FIELD_NAME_ERROR}`)
-    .default("StrydLBSSmod"),
   ILR_FIELD: z
     .string()
     .regex(FIELD_NAME_REGEX, `ILR_FIELD ${FIELD_NAME_ERROR}`)
     .default("StrydILR"),
+  // Eccentric LBSS custom-field name (v0.7.1, #16-lite). The include_ecc flag on
+  // the aggregation tools reports this field alongside lbss. An empty string
+  // DISABLES the feature (include_ecc then errors fast); any non-empty value is
+  // validated as a CamelCase code like the other field vars.
+  ECC_FIELD: z
+    .union([z.literal(""), z.string().regex(FIELD_NAME_REGEX, `ECC_FIELD ${FIELD_NAME_ERROR}`)])
+    .default("EccLBSS"),
+  // Comma-separated list of Intervals.icu custom stream codes to fetch and
+  // surface as per-split averages in get_activity_streams_summary. Default ""
+  // (disabled). Each code is validated as a CamelCase field name. Example:
+  // EXTRA_STREAM_FIELDS=StrydLSS,StrydTemp,StrydHumidity
+  EXTRA_STREAM_FIELDS: z
+    .string()
+    .default(""),
 });
 
 export interface AppConfig {
@@ -108,10 +118,12 @@ export interface AppConfig {
   timezone: string;
   /** Primary LBSS custom-field name (env LBSS_FIELD, default StrydLBSSv2). */
   lbssField: string;
-  /** Legacy LBSS field for include_legacy side-by-side (env LBSS_FIELD_LEGACY, default StrydLBSSmod). */
-  lbssFieldLegacy: string;
   /** ILR custom-field name (env ILR_FIELD, default StrydILR). */
   ilrField: string;
+  /** Eccentric LBSS custom-field name (env ECC_FIELD, default EccLBSS; "" disables include_ecc). */
+  eccField: string;
+  /** Extra Intervals custom stream codes for per-split avg in streams summary (env EXTRA_STREAM_FIELDS, default []). */
+  extraStreamFields: string[];
 }
 
 /**
@@ -148,6 +160,27 @@ export function loadConfig(): AppConfig {
     throw new Error(`Environment variable validation failed:\n${messages}`);
   }
 
+  // Parse EXTRA_STREAM_FIELDS: split by comma, trim, drop empty, validate each,
+  // then dedupe (including dedup against ILR_FIELD to avoid double-fetching).
+  const rawExtras = parsed.data.EXTRA_STREAM_FIELDS;
+  const extraStreamFields: string[] = [];
+  if (rawExtras.trim() !== "") {
+    const parts = rawExtras.split(",").map((s) => s.trim()).filter((s) => s.length > 0);
+    const invalids = parts.filter((s) => !FIELD_NAME_REGEX.test(s));
+    if (invalids.length > 0) {
+      throw new Error(
+        `Environment variable validation failed:\n  EXTRA_STREAM_FIELDS: "${invalids[0]}" ${FIELD_NAME_ERROR}`,
+      );
+    }
+    const seen = new Set<string>([parsed.data.ILR_FIELD]);
+    for (const code of parts) {
+      if (!seen.has(code)) {
+        seen.add(code);
+        extraStreamFields.push(code);
+      }
+    }
+  }
+
   cached = {
     athleteId: parsed.data.INTERVALS_ATHLETE_ID,
     apiKey: parsed.data.INTERVALS_API_KEY,
@@ -158,8 +191,9 @@ export function loadConfig(): AppConfig {
     readOnly: parsed.data.READ_ONLY === "true",
     timezone: parsed.data.ATHLETE_TIMEZONE,
     lbssField: parsed.data.LBSS_FIELD,
-    lbssFieldLegacy: parsed.data.LBSS_FIELD_LEGACY,
     ilrField: parsed.data.ILR_FIELD,
+    eccField: parsed.data.ECC_FIELD,
+    extraStreamFields,
   };
   return cached;
 }

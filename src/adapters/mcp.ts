@@ -38,11 +38,11 @@ export function registerToolDef(server: McpServer, t: ToolDef): void {
       const onAbort = () => {
         cancelled = true;
         console.error(
-          `[intervals-mcp-server] tool cancel name=${t.name} requestId=${requestId} elapsed_ms=${Date.now() - startedAt}`
+          `[intervals-stryd] tool cancel name=${t.name} requestId=${requestId} elapsed_ms=${Date.now() - startedAt}`
         );
       };
       extra?.signal?.addEventListener("abort", onAbort, { once: true });
-      console.error(`[intervals-mcp-server] tool start name=${t.name} requestId=${requestId}`);
+      console.error(`[intervals-stryd] tool start name=${t.name} requestId=${requestId}`);
 
       try {
         // Re-parse so Zod defaults apply (MCP transport can skip them).
@@ -50,7 +50,7 @@ export function registerToolDef(server: McpServer, t: ToolDef): void {
         const data = await t.handler(args, { signal: extra?.signal });
         const elapsedMs = Date.now() - startedAt;
         console.error(
-          `[intervals-mcp-server] tool end name=${t.name} requestId=${requestId} elapsed_ms=${elapsedMs} cancelled=${cancelled || extra?.signal?.aborted === true}`
+          `[intervals-stryd] tool end name=${t.name} requestId=${requestId} elapsed_ms=${elapsedMs} cancelled=${cancelled || extra?.signal?.aborted === true}`
         );
         return {
           content: [
@@ -76,7 +76,7 @@ export function registerToolDef(server: McpServer, t: ToolDef): void {
               ? err.message
               : String(err);
         console.error(
-          `[intervals-mcp-server] tool error name=${t.name} requestId=${requestId} elapsed_ms=${elapsedMs} message=${logMessage}`
+          `[intervals-stryd] tool error name=${t.name} requestId=${requestId} elapsed_ms=${elapsedMs} message=${logMessage}`
         );
         throw err;
       } finally {

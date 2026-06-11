@@ -37,10 +37,13 @@ describe("cli", () => {
       title: string;
       description: string;
     }>;
-    expect(tools).toHaveLength(17);
+    expect(tools).toHaveLength(23);
     const names = tools.map((t) => t.name);
     expect(names).toContain("get_activities");
     expect(names).toContain("get_current_pmc");
+    expect(names).toContain("list_gear");
+    expect(names).toContain("create_gear");
+    expect(names).toContain("update_lbss_ci_table");
     // Descriptions are part of the catalog so it is browsable without creds.
     for (const t of tools) {
       expect(t.description.length).toBeGreaterThan(0);
@@ -108,7 +111,7 @@ describe("cli list — credential-free", () => {
     vi.resetModules();
   });
 
-  it("lists all 17 tools with no INTERVALS_* env set", async () => {
+  it("lists all 23 tools with no INTERVALS_* env set", async () => {
     vi.resetModules();
     const saved = { ...process.env };
     try {
@@ -128,7 +131,7 @@ describe("cli list — credential-free", () => {
       expect(code).toBe(0);
       expect(stderr).toBe("");
       const tools = JSON.parse(stdout) as Array<{ name: string }>;
-      expect(tools).toHaveLength(17);
+      expect(tools).toHaveLength(23);
     } finally {
       for (const k of Object.keys(process.env)) if (!(k in saved)) delete process.env[k];
       Object.assign(process.env, saved);

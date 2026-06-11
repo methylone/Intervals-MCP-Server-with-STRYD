@@ -63,6 +63,7 @@ describe("cache", () => {
     { type: "time", data: [0, 1, 2, 3] },
     { type: "fixed_heartrate", data: [120, 121, 122, 123] },
   ];
+  const MOCK_TYPES = ["time", "fixed_heartrate"];
 
   it("cache miss — returns null for uncached activity", async () => {
     const result = await cacheGet("i99999999");
@@ -70,21 +71,21 @@ describe("cache", () => {
   });
 
   it("cache hit — returns stored data after cacheSet", async () => {
-    await cacheSet("i12345678", MOCK_STREAMS);
+    await cacheSet("i12345678", MOCK_TYPES, MOCK_STREAMS);
     const result = await cacheGet("i12345678");
     expect(result).toEqual(MOCK_STREAMS);
   });
 
-  it("cacheSet creates directory and writes valid JSON", async () => {
-    await cacheSet("i12345678", MOCK_STREAMS);
+  it("cacheSet creates directory and writes a v2 envelope", async () => {
+    await cacheSet("i12345678", MOCK_TYPES, MOCK_STREAMS);
     const raw = await readFile(join(testDir, "i12345678.json"), "utf-8");
     const parsed = JSON.parse(raw);
-    expect(parsed).toEqual(MOCK_STREAMS);
+    expect(parsed).toEqual({ v: 2, types: MOCK_TYPES, streams: MOCK_STREAMS });
   });
 
   it("cacheClear() — removes all cached activities and reports the count", async () => {
-    await cacheSet("i11111111", MOCK_STREAMS);
-    await cacheSet("i22222222", MOCK_STREAMS);
+    await cacheSet("i11111111", MOCK_TYPES, MOCK_STREAMS);
+    await cacheSet("i22222222", MOCK_TYPES, MOCK_STREAMS);
 
     const deleted = await cacheClear();
     expect(deleted).toBe(2);
@@ -93,8 +94,8 @@ describe("cache", () => {
   });
 
   it("cacheClear(id) — removes only the named activity", async () => {
-    await cacheSet("i11111111", MOCK_STREAMS);
-    await cacheSet("i22222222", MOCK_STREAMS);
+    await cacheSet("i11111111", MOCK_TYPES, MOCK_STREAMS);
+    await cacheSet("i22222222", MOCK_TYPES, MOCK_STREAMS);
 
     const deleted = await cacheClear("i11111111");
     expect(deleted).toBe(1);
@@ -133,14 +134,14 @@ describe("cache", () => {
   });
 
   it("setCacheEnabled(false) bypasses reads and writes; re-enabling restores access", async () => {
-    await cacheSet("i11111111", MOCK_STREAMS); // written while enabled
+    await cacheSet("i11111111", MOCK_TYPES, MOCK_STREAMS); // written while enabled
 
     setCacheEnabled(false);
     expect(isCacheEnabled()).toBe(false);
     // existing file is ignored while disabled
     expect(await cacheGet("i11111111")).toBeNull();
     // writes are no-ops while disabled
-    await cacheSet("i22222222", MOCK_STREAMS);
+    await cacheSet("i22222222", MOCK_TYPES, MOCK_STREAMS);
 
     setCacheEnabled(true);
     expect(await cacheGet("i22222222")).toBeNull(); // never persisted
@@ -152,7 +153,42 @@ describe("cache", () => {
     vi.resetModules();
     const mod = await import("../src/core/cache.js");
     expect(mod.isCacheEnabled()).toBe(false);
-    await mod.cacheSet("i33333333", MOCK_STREAMS);
+    await mod.cacheSet("i33333333", MOCK_TYPES, MOCK_STREAMS);
     expect(await mod.cacheGet("i33333333")).toBeNull();
+  });
+
+  // ── Envelope v2: type-coverage hit/miss ───────────────────────────────────
+  it("hits when required types ⊆ recorded types", async () => {
+    await cacheSet("i44444444", ["time", "watts", "altitude", "StrydILR"], MOCK_STREAMS);
+    // a covered subset → hit
+    expect(await cacheGet("i44444444", ["time", "watts"])).toEqual(MOCK_STREAMS);
+    // exact set → hit
+    expect(await cacheGet("i44444444", ["time", "watts", "altitude", "StrydILR"])).toEqual(MOCK_STREAMS);
+    // no requirement → hit
+    expect(await cacheGet("i44444444")).toEqual(MOCK_STREAMS);
+  });
+
+  it("misses when a required type was not in the recorded request set", async () => {
+    // Mimics the v1 bug: summary cached without ILR/altitude, CI tool needs them.
+    await cacheSet("i55555555", ["time", "fixed_watts"], MOCK_STREAMS);
+    expect(await cacheGet("i55555555", ["StrydILR"])).toBeNull();
+    expect(await cacheGet("i55555555", ["time", "altitude"])).toBeNull();
+  });
+
+  it("coverage is judged on the requested set, not on which streams came back", async () => {
+    // StrydILR was requested but the activity had none, so it is absent from the
+    // stored streams — yet a later StrydILR request is still a hit (no re-fetch).
+    await cacheSet("i66666666", ["time", "StrydILR"], MOCK_STREAMS);
+    expect(await cacheGet("i66666666", ["StrydILR"])).toEqual(MOCK_STREAMS);
+  });
+
+  it("treats a legacy v1 array file as a miss (replaced on next set)", async () => {
+    // Pre-v2 cache files were a bare ActivityStreamRaw[]; write one directly.
+    await writeFile(join(testDir, "i77777777.json"), JSON.stringify(MOCK_STREAMS));
+    expect(await cacheGet("i77777777")).toBeNull();
+    expect(await cacheGet("i77777777", ["time"])).toBeNull();
+    // a subsequent set upgrades it to v2
+    await cacheSet("i77777777", MOCK_TYPES, MOCK_STREAMS);
+    expect(await cacheGet("i77777777", ["time"])).toEqual(MOCK_STREAMS);
   });
 });

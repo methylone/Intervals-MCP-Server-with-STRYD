@@ -4,7 +4,7 @@ import type { ToolDef, ToolContext } from "../../tool-registry.js";
 import { config_, FIELD_NAME_REGEX } from "../../config.js";
 import { intervalsClient } from "../intervals-client.js";
 import type { Activity } from "../types.js";
-import { readNumericField } from "../../utils/field-access.js";
+import { readNumericField, resolveEccField } from "../../utils/field-access.js";
 
 export function formatPace(movingTimeSec: number, distanceMeters: number): string | null {
   if (!distanceMeters || distanceMeters <= 0) return null;
@@ -31,7 +31,9 @@ export const searchSimilarActivitiesTool: ToolDef = {
     "Useful for estimating LBSS/RSS of planned sessions based on similar past efforts, " +
     "and for comparing performance across different temperature conditions. " +
     "Temperature filters use feels-like temp (Open-Meteo). Activities without weather data " +
-    "(has_weather=false) are excluded when temp filters are set.",
+    "(has_weather=false) are excluded when temp filters are set. " +
+    "Set include_ecc=true to add eccentric LBSS (env ECC_FIELD, default EccLBSS) as a per-activity " +
+    "ecc field and summary.avg_ecc — so Ecc lands in its own key instead of overloading lbss.",
   schema: {
         oldest: z
           .string()
@@ -91,6 +93,13 @@ export const searchSimilarActivitiesTool: ToolDef = {
             'Override the LBSS custom-field name for the lbss output and "lbss" sort ' +
             '(e.g. "StrydLBSSv2", "StrydLBSSmod"). Defaults to env LBSS_FIELD.',
           ),
+        include_ecc: z
+          .boolean()
+          .optional()
+          .describe(
+            "When true, add eccentric LBSS (env ECC_FIELD, default EccLBSS) as a per-activity " +
+            "ecc field and summary.avg_ecc. Errors if ECC_FIELD is disabled (empty).",
+          ),
   },
   handler: async ({
       oldest,
@@ -106,6 +115,7 @@ export const searchSimilarActivitiesTool: ToolDef = {
       sort_by = "date",
       limit = 20,
       lbss_field,
+      include_ecc,
     }: {
       oldest: string;
       newest: string;
@@ -120,9 +130,12 @@ export const searchSimilarActivitiesTool: ToolDef = {
       sort_by?: "date" | "distance" | "rss" | "lbss";
       limit?: number;
       lbss_field?: string;
+      include_ecc?: boolean;
     }, ctx?: ToolContext) => {
       const lbssField = lbss_field ?? config_.lbssField;
       const ilrField = config_.ilrField;
+      const withEcc = include_ecc ?? false;
+      const eccField = withEcc ? resolveEccField(config_.eccField) : "";
       const raw = await intervalsClient.getActivities(oldest, newest, { signal: ctx?.signal });
       const activities = raw as Activity[];
 
@@ -214,6 +227,7 @@ export const searchSimilarActivitiesTool: ToolDef = {
           elevation_gain_m: elevGain,
           rss: a.icu_training_load ?? null,
           lbss: readNumericField(a, lbssField),
+          ...(withEcc ? { ecc: readNumericField(a, eccField) } : {}),
           ilr: readNumericField(a, ilrField),
           avg_hr: avgHr,
           avg_power: avgPower,
@@ -236,6 +250,7 @@ export const searchSimilarActivitiesTool: ToolDef = {
       const summary = {
         avg_rss: avgOrNull(mappedAll.map((a) => a.rss)),
         avg_lbss: avgOrNull(mappedAll.map((a) => a.lbss)),
+        ...(withEcc ? { avg_ecc: avgOrNull(matched.map((a) => readNumericField(a, eccField))) } : {}),
         avg_duration_min:
           mappedAll.length > 0
             ? Math.round(

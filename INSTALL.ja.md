@@ -17,9 +17,12 @@ AI アシスタントに渡してセットアップを代行させることも�
   URL に表示されます（`i12345678` のような短い文字列）。athlete ID に `0` を指定することもでき、
   これは「この API key の所有者」を意味します。
 - **（任意）Stryd エクステンション。** `get_current_pmc`、`get_weekly_summary`、
-  `get_phase_summary` の各ツールは Stryd の負荷指標（LBSS / ILR）を使用します。これらには
-  Stryd パワーメーター**と** 3 つの Intervals.icu カスタムフィールドが必要です —
+  `get_phase_summary`、`estimate_critical_impact` の各ツールは Stryd の負荷指標（LBSS / ILR）を
+  使用します。これらには Stryd パワーメーター**と**、少数の Intervals.icu カスタムフィールド
+  （最低限、LBSS フィールドと `StrydILR`）が必要です —
   [Stryd カスタムフィールドの設定](#stryd-カスタムフィールドの設定任意)を参照してください。
+  （`estimate_critical_impact` は Stryd API を使わず、ストリーム + Critical Power から
+  Stryd の Critical Impact を逆算します。）
   **コアツールは Stryd なしでも動作します** — エクステンションはパワーベースの PMC を上乗せするだけです。
 - **（任意）天候メトリクス。** `search_similar_activities` が使用する `average_feels_like` の値は、
   Intervals.icu の Open-Meteo エンリッチメントに由来します。温度フィルタを設定すると、天候データの
@@ -49,7 +52,7 @@ npm パッケージを直接実行できます——clone もビルドも不要:
 ```json
 {
   "mcpServers": {
-    "intervals": {
+    "intervals-stryd": {
       "command": "npx",
       "args": ["-y", "intervals-mcp-with-stryd"],
       "env": {
@@ -72,6 +75,13 @@ npm パッケージを直接実行できます——clone もビルドも不要:
 
 Stryd 拡張には、下記
 [Stryd カスタムフィールドの設定](#stryd-カスタムフィールドの設定任意)を追加してください。
+
+> **0.10.0 以前からの更新時:** ツールの namespace が全インストール方式で
+> **`intervals-stryd`** に統一されました（従来はコマンド設定が `intervals`、MCPB バンドルが
+> `Intervals MCP with STRYD`）。コマンド設定のユーザーは `mcpServers` のキーを
+> `intervals` → `intervals-stryd` にリネームしてください。MCPB のユーザーは更新後に自動で
+> 新しい namespace が適用されます。旧 namespace でキーされたクライアント側メモリは引き継がれ
+> ません（一度きりのリセットが発生します）。
 
 ## ソースからインストール（開発 / HTTP / Docker）
 
@@ -120,27 +130,37 @@ npm run build
   Intervals.icu アカウントに書き込めなくなります。ローカル専用ツールは残ります。あくまでローカルの
   緩和策で、API キー自体は全アクセス権を持ちます。（MCPB 利用時は拡張設定の「Read-only mode」
   トグルを使用。）
+- **`LBSS_FIELD`** / **`LBSS_FIELD_LEGACY`** / **`ILR_FIELD`** — Stryd 集計ツールが読み取る
+  Intervals.icu のカスタムフィールドコード（CamelCase、アンダースコア不可）。デフォルトは
+  `StrydLBSSv2` / `StrydLBSSmod` / `StrydILR`。再キャリブレーションや改名があってもコード変更が
+  不要なように設定可能です。LBSS 系ツールは per-call の `lbss_field` 上書きも受け付け、
+  `include_legacy=true` で `LBSS_FIELD_LEGACY` を併記します。
+  **v0.6.0 で LBSS の既定が `StrydLBSSmod` → `StrydLBSSv2` に変更されました** — アカウントに
+  コミュニティの `StrydLBSSmod` フィールドしかない場合は、
+  [フィールド設定ガイド](<https://github.com/methylone/Intervals-MCP-Server-with-STRYD/wiki/Stryd-LBSS-v2-Field-Setup-(日本語)>)
+  から `StrydLBSSv2` を作成するか、`LBSS_FIELD=StrydLBSSmod` を設定して以前の動作に戻してください。
 
 ### Stryd カスタムフィールドの設定（任意）
 
-Stryd エクステンションは 3 つの Intervals.icu **カスタムアクティビティフィールド**を読み取ります。
-これらはコミュニティ共有のフィールドで、自分のアカウントに追加するものです — 組み込みではありません。
-有効化するには:
+Stryd エクステンションは Intervals.icu の **カスタムアクティビティフィールド**を読み取ります。
+これらはコミュニティ共有（または自作）のフィールドで、自分のアカウントに追加するものです —
+組み込みではありません。最低限 **`StrydILR`** と 1 つの **LBSS フィールド**が必要で、残りは任意です。
+追加するには:
 
-1. Intervals.icu で **Settings → Sports Settings → Run → Custom Fields →
-   Activity fields** を開きます。
-2. 検索ボックスで、次の 3 つのフィールドをそれぞれ探して追加します:
+1. Intervals.icu で **Settings → Sport Settings → RUN → CUSTOM FIELDS**（ボタン）を開くと、
+   **Activity Fields** ダイアログが表示されます。ここで **ADD FIELD** から新規フィールドを作成するか、
+   虫眼鏡付きの **FIELD** 検索からコミュニティ共有フィールドを追加できます。（フィールドの作成・編集時は
+   **TYPE / DESCRIPTION / SCRIPT** の各タブで定義します。小数桁は「Decimals」ではなく **Format**
+   （例: `.1f`）で設定します。）
 
-   | 表示名 | フィールドコード（本サーバが読み取る） | 共有者 |
+2. 必要なフィールドを追加します。**`StrydILR` と LBSS フィールド 1 つが必須**、残りは任意です:
+
+   | フィールドコード（本サーバが読み取る） | 必須? | 内容 / 入手方法 |
    |---|---|---|
-   | Stryd LBSS mod | `StrydLBSSmod` | miguell |
-   | Stryd ILR | `StrydILR` | Knuefi |
-   | Stryd ILR @Treshold | `StrydILRTreshold` | miguell |
-
-   `StrydLBSSmod`（Lower Body Stress Score）は LBSS ベースの PMC が依拠するフィールドです。
-   `StrydILR` / `StrydILRTreshold` は Impact Loading Rate（衝撃負荷率）の指標を追加します。
-   フィールドコードは **`Treshold` の綴りを含めて**正確に一致させる必要があります — それが実際の
-   フィールド名です。
+   | `StrydLBSSv2` *または* `StrydLBSSmod` | **必須**（LBSS フィールド 1 つ） | Lower Body Stress Score — LBSS ベースの PMC が依拠します。`StrydLBSSv2` は Stryd に忠実な再キャリブレーション版で**コミュニティ検索には出ません**。[フィールド設定ガイド](<https://github.com/methylone/Intervals-MCP-Server-with-STRYD/wiki/Stryd-LBSS-v2-Field-Setup-(日本語)>)から作成してください。コミュニティの `StrydLBSSmod`（*miguell* 共有）は検索可能で、`LBSS_FIELD=StrydLBSSmod` を設定すれば使えます。 |
+   | `StrydILR` | **必須** | Impact Loading Rate（衝撃負荷率）。コミュニティ共有（*Knuefi*）— **FIELD** 検索から追加します。 |
+   | `StrydILRTreshold` | 任意 | ILR @ 閾値。コミュニティ共有（*miguell*）。**本サーバは消費しません**（アプリ内の ILR 表示に使われます）。コードは **`Treshold` の綴りを含めて**正確に一致させる必要があり、"ILR@CP Calculator" カスタムフィールドに依存します（そのフィールド自身の説明を参照）。 |
+   | `EccLBSS` | 任意 | Eccentric（下り）LBSS。**本サーバは消費しません**。下り/偏心刺激を別途分析する場合に有用で、[フィールド設定ガイド](<https://github.com/methylone/Intervals-MCP-Server-with-STRYD/wiki/Stryd-LBSS-v2-Field-Setup-(日本語)>)で扱っています。 |
 
 3. 追加すると、これらの値は**新しい Run アクティビティ**にコピーされるので、`get_current_pmc`、
    `get_weekly_summary`、`get_phase_summary`、および `get_activity_detail` /
@@ -150,9 +170,6 @@ Stryd エクステンションは 3 つの Intervals.icu **カスタムアクテ
 Stryd の LBSS/ILR データは概ね **2025 年 11 月**以降でのみ利用可能なので、それより古いアクティビティには
 いずれにせよ付きません。その範囲内のアクティビティについては、Intervals.icu で再処理することで値を
 バックフィルできます。
-
-> `Stryd ILR @Treshold` はさらに、"ILR@CP Calculator" カスタムフィールドが正しく設定されていることに
-> 依存します — そのフィールド自身の説明（Intervals.icu 内）を参照してください。
 
 ## クライアントの接続
 
@@ -167,7 +184,7 @@ Stryd の LBSS/ILR データは概ね **2025 年 11 月**以降でのみ利用�
 ```json
 {
   "mcpServers": {
-    "intervals": {
+    "intervals-stryd": {
       "command": "node",
       "args": ["/absolute/path/to/intervals-mcp-server/build/index.js"],
       "env": {
@@ -180,7 +197,7 @@ Stryd の LBSS/ILR データは概ね **2025 年 11 月**以降でのみ利用�
 }
 ```
 
-Claude Desktop を再起動すると、`intervals` のツールが表示されるはずです。
+Claude Desktop を再起動すると、`intervals-stryd` のツールが表示されるはずです。
 
 ### Codex CLI — stdio
 
@@ -223,7 +240,7 @@ HTTPS でないため `--allow-http` が必要です:
 ```json
 {
   "mcpServers": {
-    "intervals": {
+    "intervals-stryd": {
       "command": "npx",
       "args": ["mcp-remote", "http://<server-host-on-your-vpn>:8080/mcp", "--allow-http"]
     }

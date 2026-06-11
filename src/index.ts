@@ -19,14 +19,13 @@ const buildSha = process.env.BUILD_SHA ?? "unknown";
 function createServer(): McpServer {
   const server = new McpServer(
     {
-      name: "intervals-mcp-server",
+      name: "intervals-stryd",
       version: getPackageVersion(),
     },
     {
       instructions: buildServerInstructions(
         config_.timezone,
         config_.lbssField,
-        config_.lbssFieldLegacy,
       ),
     }
   );
@@ -100,7 +99,7 @@ if (isMain) {
 
         await transport.handleRequest(req, res, req.body);
       } catch (err) {
-        console.error("[intervals-mcp-server] Error handling POST /mcp:", err);
+        console.error("[intervals-stryd] Error handling POST /mcp:", err);
         if (!res.headersSent) {
           res.status(500).json({
             jsonrpc: "2.0",
@@ -142,7 +141,7 @@ if (isMain) {
 
     app.listen(config_.port, "0.0.0.0", () => {
       console.error(
-        `[intervals-mcp-server] HTTP server listening on 0.0.0.0:${config_.port} build_sha=${buildSha}`
+        `[intervals-stryd] HTTP server listening on 0.0.0.0:${config_.port} build_sha=${buildSha}`
       );
     });
   } else {
@@ -150,6 +149,6 @@ if (isMain) {
     const server = createServer();
     const transport = new StdioServerTransport();
     await server.connect(transport);
-    console.error("[intervals-mcp-server] Server started (stdio)");
+    console.error("[intervals-stryd] Server started (stdio)");
   }
 }

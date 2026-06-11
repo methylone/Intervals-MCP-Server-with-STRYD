@@ -1,8 +1,8 @@
 {
   "manifest_version": "0.3",
   "name": "intervals-mcp-with-stryd",
-  "display_name": "Intervals MCP with STRYD",
-  "version": "0.6.0",
+  "display_name": "intervals-stryd",
+  "version": "0.12.0",
   "description": "An Intervals.icu MCP server built for Stryd runners — power-based running analysis (a dual PMC with RSS and LBSS), designed so the LLM never does the math.",
   "author": {
     "name": "methylone"
@@ -39,8 +39,9 @@
         "READ_ONLY": "${user_config.read_only}",
         "CACHE_ENABLED": "${user_config.cache_enabled}",
         "LBSS_FIELD": "${user_config.lbss_field}",
-        "LBSS_FIELD_LEGACY": "${user_config.lbss_field_legacy}",
         "ILR_FIELD": "${user_config.ilr_field}",
+        "ECC_FIELD": "${user_config.ecc_field}",
+        "EXTRA_STREAM_FIELDS": "${user_config.extra_stream_fields}",
         "CACHE_DIR": "${HOME}/.intervals-mcp-with-stryd/cache/streams"
       }
     }
@@ -87,19 +88,26 @@
       "required": false,
       "default": "StrydLBSSv2"
     },
-    "lbss_field_legacy": {
-      "type": "string",
-      "title": "Legacy LBSS custom-field code",
-      "description": "Legacy LBSS field reported side by side when a tool is called with include_legacy=true (for migration comparison). Default StrydLBSSmod.",
-      "required": false,
-      "default": "StrydLBSSmod"
-    },
     "ilr_field": {
       "type": "string",
       "title": "ILR custom-field code",
       "description": "Intervals.icu custom-field code for Impact Loading Rate (CamelCase, no underscore). Default StrydILR.",
       "required": false,
       "default": "StrydILR"
+    },
+    "ecc_field": {
+      "type": "string",
+      "title": "Eccentric LBSS custom-field code",
+      "description": "Intervals.icu custom-field code for eccentric LBSS (CamelCase, no underscore), reported when a tool is called with include_ecc=true. Default EccLBSS; leave blank to disable include_ecc.",
+      "required": false,
+      "default": "EccLBSS"
+    },
+    "extra_stream_fields": {
+      "type": "string",
+      "title": "Extra custom stream codes",
+      "description": "Comma-separated Intervals.icu custom stream codes to surface as per-split averages in get_activity_streams_summary (extras / extras_run). Each code must be mapped in Intervals.icu Settings → Developer → Custom Streams before use. Recommended: StrydLSS,StrydTemp,StrydHumidity (requires the Wiki stream setup). Leave blank to disable.",
+      "required": false,
+      "default": ""
     }
   },
   "compatibility": {
@@ -163,6 +171,22 @@
       "description": "Calculate rolling HRV statistics (mean, SD, coefficient of variation) for recovery trend analysis."
     },
     {
+      "name": "list_gear",
+      "description": "Fetch all gear (shoes/bikes) for the athlete from Intervals.icu as a raw passthrough, including retired gear and odometer (distance/time) fields."
+    },
+    {
+      "name": "assign_gear",
+      "description": "Assign a gear item (shoe) to one or more activities on Intervals.icu. Writes to the account (withheld in READ_ONLY); skips activities already on the target gear."
+    },
+    {
+      "name": "create_gear",
+      "description": "Create a new gear item (shoe/bike) on Intervals.icu. Writes to the account (withheld in READ_ONLY); returns the created gear whose id is usable with assign_gear."
+    },
+    {
+      "name": "retire_gear",
+      "description": "Retire a gear item (shoe) on Intervals.icu so it stops appearing as a default assignment. Writes to the account (withheld in READ_ONLY); un-retire is out of scope."
+    },
+    {
       "name": "clear_cache",
       "description": "Clear the on-disk stream cache (all cached activities, or a single one)."
     },
@@ -181,6 +205,14 @@
     {
       "name": "get_phase_summary",
       "description": "Get a training phase summary with per-week breakdown and ramp rate analysis."
+    },
+    {
+      "name": "estimate_critical_impact",
+      "description": "Reverse-estimate Stryd Critical Impact (CI) for LBSS calibration from Intervals streams (watts/ILR/altitude/distance) and Critical Power, with no Stryd API."
+    },
+    {
+      "name": "update_lbss_ci_table",
+      "description": "Update the per-shoe Critical Impact (CI) table in the LBSS custom-field scripts (LBSS + Ecc fields together). Writes to the account (withheld in READ_ONLY); dry-run by default, rewrites only the managed CI_TABLE sentinel line."
     }
   ],
   "privacy_policies": [

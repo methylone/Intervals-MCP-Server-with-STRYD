@@ -17,7 +17,7 @@ import { config_, FIELD_NAME_REGEX } from "../../../config.js";
 import { intervalsClient } from "../../../core/intervals-client.js";
 import type { Activity, Wellness } from "../../../core/types.js";
 import { addDays } from "../../../utils/date.js";
-import { readNumericField } from "../../../utils/field-access.js";
+import { readNumericField, resolveEccField } from "../../../utils/field-access.js";
 import { computeLbssPmc } from "../lbss-calculator.js";
 
 /** LBSS EMA の cold-start バイアスを 1% 未満に抑える助走期間（日数）*/
@@ -57,8 +57,10 @@ export const getWeeklySummaryTool: ToolDef = {
     "- pmc_end_of_week: CTL/ATL/TSB at Sunday for both RSS and LBSS\n" +
     "- sessions: per-activity breakdown sorted by date\n" +
     "LBSS is read from the configured custom field (env LBSS_FIELD, default StrydLBSSv2); " +
-    "override per-call with lbss_field. Set include_legacy=true to also report the legacy " +
-    "LBSS field (env LBSS_FIELD_LEGACY, default StrydLBSSmod) side by side for migration checks.\n" +
+    "override per-call with lbss_field.\n" +
+    "Set include_ecc=true to also report eccentric LBSS (env ECC_FIELD, default EccLBSS) as " +
+    "totals.ecc / sessions[].ecc. No Ecc-PMC is computed (a retroactive-CI artifact); use the " +
+    "weekly ecc totals directly.\n" +
     "Note: LBSS values require Stryd data synced to Intervals (post Nov 2025).",
   schema: {
     week_start: z
@@ -73,26 +75,26 @@ export const getWeeklySummaryTool: ToolDef = {
         'Override the LBSS custom-field name for this call ' +
         '(e.g. "StrydLBSSv2", "StrydLBSSmod"). Defaults to env LBSS_FIELD.',
       ),
-    include_legacy: z
+    include_ecc: z
       .boolean()
       .optional()
       .describe(
-        "When true, also report the legacy LBSS field (env LBSS_FIELD_LEGACY) " +
-        "in totals, sessions, and end-of-week PMC for new-vs-old comparison.",
+        "When true, also report eccentric LBSS (env ECC_FIELD, default EccLBSS) as " +
+        "totals.ecc and sessions[].ecc. Errors if ECC_FIELD is disabled (empty).",
       ),
   },
   handler: async (
-    { week_start: weekStart, lbss_field, include_legacy }: {
+    { week_start: weekStart, lbss_field, include_ecc }: {
       week_start: string;
       lbss_field?: string;
-      include_legacy?: boolean;
+      include_ecc?: boolean;
     },
     ctx?: ToolContext,
   ) => {
       const lbssField = lbss_field ?? config_.lbssField;
       const ilrField = config_.ilrField;
-      const legacyField = config_.lbssFieldLegacy;
-      const withLegacy = include_legacy ?? false;
+      const withEcc = include_ecc ?? false;
+      const eccField = withEcc ? resolveEccField(config_.eccField) : "";
 
       const weekEnd = addDays(weekStart, 6); // Sunday
       const warmupStart = addDays(weekStart, -WARMUP_DAYS);
@@ -122,7 +124,7 @@ export const getWeeklySummaryTool: ToolDef = {
           1,
         ),
         lbss: round(sumField(lbssField), 1),
-        ...(withLegacy ? { lbss_legacy: round(sumField(legacyField), 1) } : {}),
+        ...(withEcc ? { ecc: round(sumField(eccField), 1) } : {}),
         time_min: Math.round(
           weekActivities.reduce((s, a) => s + a.moving_time, 0) / 60,
         ),
@@ -158,7 +160,6 @@ export const getWeeklySummaryTool: ToolDef = {
       };
 
       // LBSS 系: 助走期間含む全アクティビティから EMA を計算し週末値を取得
-      // （activities 取得は1回、計算のみ legacy 併記時に2回）
       const lbssSeries = computeLbssPmc(allActivities, warmupStart, weekEnd, lbssField);
       const lbssEnd = lbssSeries.at(-1);
       const pmcLbss = {
@@ -166,16 +167,6 @@ export const getWeeklySummaryTool: ToolDef = {
         atl: round(lbssEnd?.atl ?? 0, 1),
         tsb: round(lbssEnd?.tsb ?? 0, 1),
       };
-
-      let pmcLbssLegacy: { ctl: number | null; atl: number | null; tsb: number | null } | undefined;
-      if (withLegacy) {
-        const legacyEnd = computeLbssPmc(allActivities, warmupStart, weekEnd, legacyField).at(-1);
-        pmcLbssLegacy = {
-          ctl: round(legacyEnd?.ctl ?? 0, 1),
-          atl: round(legacyEnd?.atl ?? 0, 1),
-          tsb: round(legacyEnd?.tsb ?? 0, 1),
-        };
-      }
 
       // ── セッション一覧（週内のみ、日付昇順）──────────────────────────
       const sessions = weekActivities
@@ -186,7 +177,7 @@ export const getWeeklySummaryTool: ToolDef = {
           type: a.type,
           rss: round(a.icu_training_load ?? null, 1),
           lbss: round(readNumericField(a, lbssField), 1),
-          ...(withLegacy ? { lbss_legacy: round(readNumericField(a, legacyField), 1) } : {}),
+          ...(withEcc ? { ecc: round(readNumericField(a, eccField), 1) } : {}),
           ilr: round(readNumericField(a, ilrField), 2),
           duration_min: Math.round(a.moving_time / 60),
           distance_km: round(a.distance / 1000, 2),
@@ -202,7 +193,6 @@ export const getWeeklySummaryTool: ToolDef = {
         pmc_end_of_week: {
           rss: pmcRss,
           lbss: pmcLbss,
-          ...(withLegacy ? { lbss_legacy: pmcLbssLegacy } : {}),
         },
         sessions,
       };

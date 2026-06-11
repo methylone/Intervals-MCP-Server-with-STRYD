@@ -31,7 +31,6 @@ export const getCurrentPmcTool: ToolDef = {
     "- rss: RSS-based (from Intervals.icu wellness data, pre-calculated)\n" +
     "- lbss: LBSS-based (computed server-side via EMA over the past 180 days from the " +
     "configured LBSS field — env LBSS_FIELD, default StrydLBSSv2; override per-call with lbss_field)\n" +
-    "Set include_legacy=true to also return lbss_legacy from the legacy field (env LBSS_FIELD_LEGACY).\n" +
     "Note: lbss values are 0 if no Stryd data is available in the period.",
   schema: {
     lbss_field: z
@@ -42,20 +41,12 @@ export const getCurrentPmcTool: ToolDef = {
         'Override the LBSS custom-field name for this call ' +
         '(e.g. "StrydLBSSv2", "StrydLBSSmod"). Defaults to env LBSS_FIELD.',
       ),
-    include_legacy: z
-      .boolean()
-      .optional()
-      .describe(
-        "When true, also return lbss_legacy (CTL/ATL/TSB) from the legacy LBSS " +
-        "field (env LBSS_FIELD_LEGACY) for new-vs-old comparison.",
-      ),
   },
   handler: async (
-    { lbss_field, include_legacy }: { lbss_field?: string; include_legacy?: boolean },
+    { lbss_field }: { lbss_field?: string },
     ctx?: ToolContext,
   ) => {
     const lbssField = lbss_field ?? config_.lbssField;
-    const withLegacy = include_legacy ?? false;
     const endDate = today(config_.timezone);
       const startDate = addDays(endDate, -WARMUP_DAYS);
 
@@ -90,16 +81,6 @@ export const getCurrentPmcTool: ToolDef = {
         tsb: Math.round((lbssToday?.tsb ?? 0) * 10) / 10,
       };
 
-      let lbssLegacy: { ctl: number; atl: number; tsb: number } | undefined;
-      if (withLegacy) {
-        const legacyToday = computeLbssPmc(activities, startDate, endDate, config_.lbssFieldLegacy).at(-1);
-        lbssLegacy = {
-          ctl: Math.round((legacyToday?.ctl ?? 0) * 10) / 10,
-          atl: Math.round((legacyToday?.atl ?? 0) * 10) / 10,
-          tsb: Math.round((legacyToday?.tsb ?? 0) * 10) / 10,
-        };
-      }
-
-    return { date: endDate, rss, lbss, ...(withLegacy ? { lbss_legacy: lbssLegacy } : {}) };
+    return { date: endDate, rss, lbss };
   },
 };

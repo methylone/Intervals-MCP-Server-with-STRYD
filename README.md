@@ -23,6 +23,9 @@ multi-user service.
   `StrydLBSSv2` / `StrydILR`) so a recalibrated or renamed field needs no code change —
   see [INSTALL.md](INSTALL.md#setting-up-the-stryd-custom-fields-optional) and the
   [field recipes](https://github.com/methylone/Intervals-MCP-Server-with-STRYD/wiki/LLM-Agent-Recipes).
+  `estimate_critical_impact` reverse-estimates Stryd's Critical Impact from your
+  Intervals streams and Critical Power (no Stryd API), so LBSS calibration stays
+  self-contained.
 - **Core (any Intervals.icu user).** List and inspect activities, wellness, HRV
   trends, events / planned workouts (read + create / update / delete), athlete
   summaries, and stream-level analysis (splits, cardiac decoupling, grade-adjusted
@@ -52,7 +55,7 @@ No clone, no build. Point your client at the published npm package:
 ```json
 {
   "mcpServers": {
-    "intervals": {
+    "intervals-stryd": {
       "command": "npx",
       "args": ["-y", "intervals-mcp-with-stryd"],
       "env": {
