@@ -12,7 +12,7 @@ not to guess.
 It is designed to run **locally, for a single athlete (you)** — not as a hosted,
 multi-user service.
 
-# Background
+## Background
 
 I also wrote a race report about how this tool came to be and how it was tested in the Nara 100 km Ultramarathon:
 
