@@ -12,6 +12,12 @@ not to guess.
 It is designed to run **locally, for a single athlete (you)** — not as a hosted,
 multi-user service.
 
+# Background
+
+I also wrote a race report about how this tool came to be and how it was tested in the Nara 100 km Ultramarathon:
+
+[Background: from building this tool to testing it in the Nara 100 km Ultramarathon](https://note.com/methylone/n/n6bc221063fe3?hl=en)
+
 ## What it does
 
 - **Stryd extension (the reason this exists).** A second Performance Management Chart
