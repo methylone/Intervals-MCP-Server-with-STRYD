@@ -2,6 +2,27 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.12.1] — 2026-07-03
+
+### Documentation
+
+- **Runner-facing onboarding pass** (`README.md` / `README.ja.md`): plain-language
+  intro sentence ahead of the technical definition, a dual PMC chart screenshot
+  (`docs/images/dual_pmc.jpg`), a "Try it now" section with zero-setup example
+  questions, and an "AI-assisted install" pointer promoted to the top of Quick start.
+- **`INSTALL.md` / `INSTALL.ja.md`**: removed leftover `LBSS_FIELD_LEGACY` /
+  `include_legacy` references (the feature itself was removed in v0.12.0; the docs
+  hadn't caught up). Prerequisites reorganized by install path so MCPB users can tell
+  within the first few lines that they don't need Node.js. Added a "fastest path"
+  default (community `StrydILR` + `StrydLBSSmod`) at the top of the Stryd custom-field
+  setup section.
+- **README "Race report" section renamed** (was "Background", which collided with the
+  separate `BACKGROUND.md` design-philosophy doc linked from the Documentation list).
+- **`PUBLIC_MANIFEST.md`**: corrected the stale tool count (18 → 23) and its increment
+  notes; updated the `docs/images/dual_pmc.jpg` INCLUDE entry's version tag.
+
+No source code or test changes in this release.
+
 ## [0.12.0] — 2026-06-11
 
 ### Breaking Changes

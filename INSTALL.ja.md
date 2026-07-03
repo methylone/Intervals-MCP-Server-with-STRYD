@@ -9,13 +9,18 @@ AI アシスタントに渡してセットアップを代行させることも�
 
 ## 前提条件
 
-- **Node.js >= 20.12**（サーバは組み込みの `--env-file` フラグを使用。テストスクリプトは
-  20.12 で追加された `--env-file-if-exists` を使用します）。`node --version` で確認してください。
+**一番簡単な経路は？** 下記の MCPB でインストールするなら、必要なのは **Claude Desktop** と
+**Intervals.icu アカウント**だけです——Node.js もターミナルも不要です。
+
 - **Intervals.icu アカウント**と **API key**：intervals.icu の *Settings → Developer* で
   API key をコピーします。
 - **あなたの athlete ID**：自分のカレンダー/プロフィールを表示しているときに Intervals.icu の
   URL に表示されます（`i12345678` のような短い文字列）。athlete ID に `0` を指定することもでき、
   これは「この API key の所有者」を意味します。
+- **Claude Desktop** — 下記の **MCPB** インストール経路に必要です。
+- **Node.js >= 20.12** — **npx** または **ソースから**の経路でのみ必要で、MCPB では不要です
+  （サーバは組み込みの `--env-file` フラグを使用。テストスクリプトは 20.12 で追加された
+  `--env-file-if-exists` を使用します）。`node --version` で確認してください。
 - **（任意）Stryd エクステンション。** `get_current_pmc`、`get_weekly_summary`、
   `get_phase_summary`、`estimate_critical_impact` の各ツールは Stryd の負荷指標（LBSS / ILR）を
   使用します。これらには Stryd パワーメーター**と**、少数の Intervals.icu カスタムフィールド
@@ -130,17 +135,23 @@ npm run build
   Intervals.icu アカウントに書き込めなくなります。ローカル専用ツールは残ります。あくまでローカルの
   緩和策で、API キー自体は全アクセス権を持ちます。（MCPB 利用時は拡張設定の「Read-only mode」
   トグルを使用。）
-- **`LBSS_FIELD`** / **`LBSS_FIELD_LEGACY`** / **`ILR_FIELD`** — Stryd 集計ツールが読み取る
-  Intervals.icu のカスタムフィールドコード（CamelCase、アンダースコア不可）。デフォルトは
-  `StrydLBSSv2` / `StrydLBSSmod` / `StrydILR`。再キャリブレーションや改名があってもコード変更が
-  不要なように設定可能です。LBSS 系ツールは per-call の `lbss_field` 上書きも受け付け、
-  `include_legacy=true` で `LBSS_FIELD_LEGACY` を併記します。
+- **`LBSS_FIELD`** / **`ILR_FIELD`** — Stryd 集計ツールが読み取る Intervals.icu の
+  カスタムフィールドコード（CamelCase、アンダースコア不可）。デフォルトは `StrydLBSSv2` /
+  `StrydILR`。再キャリブレーションや改名があってもコード変更が不要なように設定可能です。
+  LBSS 系ツールは per-call の `lbss_field` 上書きも受け付け、別フィールドとのアドホックな
+  比較に使えます。
   **v0.6.0 で LBSS の既定が `StrydLBSSmod` → `StrydLBSSv2` に変更されました** — アカウントに
   コミュニティの `StrydLBSSmod` フィールドしかない場合は、
   [フィールド設定ガイド](<https://github.com/methylone/Intervals-MCP-Server-with-STRYD/wiki/Stryd-LBSS-v2-Field-Setup-(日本語)>)
   から `StrydLBSSv2` を作成するか、`LBSS_FIELD=StrydLBSSmod` を設定して以前の動作に戻してください。
 
 ### Stryd カスタムフィールドの設定（任意）
+
+> **まず動かすなら:** コミュニティ共有の `StrydILR` と `StrydLBSSmod` を下記の手順1の **FIELD**
+> 検索で追加し、設定で `LBSS_FIELD=StrydLBSSmod` にします（スクリプト自作不要）。より Stryd に
+> 忠実な較正が欲しくなったら、準備ができ次第
+> [フィールド設定ガイド](<https://github.com/methylone/Intervals-MCP-Server-with-STRYD/wiki/Stryd-LBSS-v2-Field-Setup-(日本語)>)
+> から `StrydLBSSv2` を作成してください。
 
 Stryd エクステンションは Intervals.icu の **カスタムアクティビティフィールド**を読み取ります。
 これらはコミュニティ共有（または自作）のフィールドで、自分のアカウントに追加するものです —

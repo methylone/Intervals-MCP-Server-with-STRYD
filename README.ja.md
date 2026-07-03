@@ -2,6 +2,14 @@
 
 # Intervals.icu MCP Server — Stryd ランナーのための
 
+一言でいうと: Claude のような AI アシスタントにあなたの Intervals.icu のデータを読ませ、
+トレーニング分析の相棒にするための部品です。数値の計算はすべてテスト済みのコードが行い、
+AI には推測させません。
+
+![Dual PMC チャート: 上段が RSS ベースの Fitness/Fatigue/Form、下段が Stryd LBSS ベースの負荷](docs/images/dual_pmc.jpg)
+
+*上: パワー（RSS）ベースの PMC。下: 着地衝撃（LBSS）ベースの PMC——同じ選手の、異なる2種類の負荷を並べて追跡。*
+
 **Stryd ランナー**のための [Intervals.icu](https://intervals.icu) MCP（Model Context
 Protocol）サーバです。LLM に計算させない設計の、ランニングパワー特化トレーニング分析
 （RSS、LBSS による dual PMC 対応）を提供します。決定的な数値（PMC の値、
@@ -32,7 +40,18 @@ Codex など）には**解釈だけ**を任せます——推測させません�
 ——その解釈は、あなた自身が書いて AI クライアントに読み込ませる「ナレッジ」ファイルから
 来ます。[`training-knowledge-template/`](training-knowledge-template/) を参照。
 
+## レースレポート
+
+このツールがどう生まれ、奈良 100km ウルトラマラソンでどうテストされたかについて、レース
+レポートも書きました:
+
+[このツールを作ってから奈良 100km ウルトラマラソンでテストするまで](https://note.com/methylone/n/n6bc221063fe3)
+
 ## クイックスタート
+
+迷ったら、このリポジトリの URL を Claude（またはお好みの AI アシスタント）に貼って
+「セットアップを手伝って」と頼むこともできます——2 ステップの手順は
+[AI に任せてインストールする](INSTALL.ja.md#ai-に任せてインストールする) を参照。
 
 クライアントに合うインストール経路を選んでください。詳細・前提条件は
 [INSTALL.ja.md](INSTALL.ja.md)。
@@ -83,6 +102,27 @@ npm run build
 ——[INSTALL.ja.md](INSTALL.ja.md) を参照。初めてですか？ リポジトリの URL を AI クライアントに
 渡し、README と INSTALL を読ませてインストールを案内させることもできます。
 
+## まず試してみる
+
+インストール後は、ナレッジファイルも Stryd のカスタムフィールドも用意せずに、すぐに質問
+できます。たとえばこんな聞き方ができます:
+
+- 「今週のトレーニングをまとめて」
+- 「今日の PMC は？ フォームの傾向も教えて」
+- 「昨日のランのスプリットと心拍デカップリングを見せて」
+
+一例:
+
+> **あなた:** 今日の PMC は？
+>
+> **Claude:** Fitness(CTL)は 50、Fatigue(ATL)は 40 なので Form(TSB)は +10——フレッシュな
+> 状態です。この3週間は Fitness が着実に上昇する一方 Fatigue は横ばいなので、今の負荷の
+> 上げ方はスパイクというより持続可能なペースに見えます。
+
+自分のトレーニング哲学を反映した、より踏み込んだコーチングが欲しくなったら →
+[`training-knowledge-template/`](training-knowledge-template/) で AI クライアントに自分の
+好みのトレーニング方針を教え込めます。
+
 ## コマンドラインでの利用
 
 同じツール群は、`intervals-mcp` CLI を使ってシェルからも実行できます（MCP クライアント不要、
@@ -97,6 +137,7 @@ LLM 不要）——自動化、`jq` へのパイプ、簡単な確認に便利�
 - [SECURITY.ja.md](SECURITY.ja.md) — **セキュリティとプライバシーモデル**: 通信先・
   読み書きの範囲・キーとキャッシュの保管場所・HTTP モード
 - [ROADMAP.md](ROADMAP.md) — 今後の予定
+- [BACKGROUND.ja.md](BACKGROUND.ja.md) — なぜ作ったか・設計思想の短い読み物
 - [`training-knowledge-template/`](training-knowledge-template/) — AI クライアント用の
   分析ナレッジを自分で作るためのテンプレート
 

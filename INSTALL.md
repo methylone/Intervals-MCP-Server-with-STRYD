@@ -9,13 +9,18 @@ into an AI assistant and have it do the setup for you (see
 
 ## Prerequisites
 
-- **Node.js >= 20.12** (the server uses the built-in `--env-file` flag; the test
-  script uses `--env-file-if-exists`, added in 20.12). Check with `node --version`.
+**Easiest path?** If you're installing via MCPB (below), all you need is
+**Claude Desktop** and an **Intervals.icu account** — no Node.js, no terminal.
+
 - **An Intervals.icu account** with an **API key**: on intervals.icu go to
   *Settings → Developer* and copy your API key.
 - **Your athlete ID**: visible in the Intervals.icu URL when viewing your own
   calendar/profile (a short string like `i12345678`). You can also set the athlete
   ID to `0`, which means "the owner of this API key".
+- **Claude Desktop** — required for the **MCPB** install path (below).
+- **Node.js >= 20.12** — only needed for the **npx** or **from-source** install
+  paths, not for MCPB (the server uses the built-in `--env-file` flag; the test
+  script uses `--env-file-if-exists`, added in 20.12). Check with `node --version`.
 - **(Optional) Stryd extension.** The `get_current_pmc`, `get_weekly_summary`,
   `get_phase_summary`, and `estimate_critical_impact` tools use Stryd load metrics
   (LBSS / ILR). These require a Stryd power meter **and** a small set of Intervals.icu
@@ -133,17 +138,24 @@ All optional variables are documented in `.env.example`. Two worth calling out:
   Local-only tools stay available. A local mitigation only — the API key still
   grants full access. (MCPB users: use the "Read-only mode" toggle in the extension
   config.)
-- **`LBSS_FIELD`** / **`LBSS_FIELD_LEGACY`** / **`ILR_FIELD`** — the Intervals.icu
-  custom-field codes the Stryd aggregation tools read (CamelCase, no underscore).
-  Defaults: `StrydLBSSv2` / `StrydLBSSmod` / `StrydILR`. Configurable so a recalibrated
-  or renamed field needs no code change; the LBSS tools also accept a per-call
-  `lbss_field` override, and `include_legacy=true` reports `LBSS_FIELD_LEGACY` alongside.
+- **`LBSS_FIELD`** / **`ILR_FIELD`** — the Intervals.icu custom-field codes the Stryd
+  aggregation tools read (CamelCase, no underscore). Defaults: `StrydLBSSv2` /
+  `StrydILR`. Configurable so a recalibrated or renamed field needs no code change;
+  the LBSS tools also accept a per-call `lbss_field` override for ad-hoc comparisons
+  against a different field.
   **v0.6.0 changed the LBSS default `StrydLBSSmod` → `StrydLBSSv2`** — if your account only
   has the community `StrydLBSSmod` field, either build `StrydLBSSv2` from the
   [field setup guide](https://github.com/methylone/Intervals-MCP-Server-with-STRYD/wiki/Stryd-LBSS-v2-Field-Setup)
   or set `LBSS_FIELD=StrydLBSSmod` to restore the previous behavior.
 
 ### Setting up the Stryd custom fields (optional)
+
+> **Fastest path:** add the community-shared `StrydILR` and `StrydLBSSmod` fields via
+> the **FIELD** search (step 1 below) and set `LBSS_FIELD=StrydLBSSmod` — no
+> script-writing required. Want a more Stryd-faithful calibration later? Build
+> `StrydLBSSv2` from the
+> [field setup guide](https://github.com/methylone/Intervals-MCP-Server-with-STRYD/wiki/Stryd-LBSS-v2-Field-Setup)
+> when you're ready.
 
 The Stryd extension reads Intervals.icu **custom activity fields**. These are
 community-shared (or self-built) fields you add to your own account — they are not built

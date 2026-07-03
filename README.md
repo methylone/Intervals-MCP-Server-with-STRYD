@@ -2,6 +2,15 @@ English | [日本語](README.ja.md)
 
 # Intervals.icu MCP Server — for Stryd runners
 
+In plain terms: this lets an AI assistant like Claude read your Intervals.icu
+training data and act as an analysis partner — with all the numbers computed by
+tested code, not guessed by the AI.
+
+![Dual PMC chart: RSS-based Fitness/Fatigue/Form on top, Stryd LBSS-based load below](docs/images/dual_pmc.jpg)
+
+*Top: power (RSS)-based PMC. Bottom: impact (LBSS)-based PMC — same athlete, two
+different loads tracked side by side.*
+
 An [Intervals.icu](https://intervals.icu) MCP (Model Context Protocol) server built
 for **Stryd runners** — power-based running analysis (a dual Performance Management
 Chart with RSS, LBSS), designed so the LLM never does the
@@ -35,13 +44,17 @@ The server provides **data and math only**. It does **not** decide how you shoul
 train — that interpretation comes from a knowledge file *you* write and load into your
 AI client. See [`training-knowledge-template/`](training-knowledge-template/).
 
-## Background
+## Race report
 
 I also wrote a race report about how this tool came to be and how it was tested in the Nara 100 km Ultramarathon:
 
-[Background: from building this tool to testing it in the Nara 100 km Ultramarathon](https://note.com/methylone/n/n6bc221063fe3?hl=en)
+[From building this tool to testing it in the Nara 100 km Ultramarathon](https://note.com/methylone/n/n6bc221063fe3?hl=en)
 
 ## Quick start
+
+Not sure where to start? Paste this repository's URL into Claude (or your AI
+assistant of choice) and ask it to walk you through setup — see
+[Let an AI install it](INSTALL.md#let-an-ai-install-it) for the two-step version.
 
 Pick the install path that matches your client. Full steps and prerequisites:
 [INSTALL.md](INSTALL.md).
@@ -92,6 +105,27 @@ Then point your client at `build/index.js` over stdio, or run HTTP / Docker — 
 [INSTALL.md](INSTALL.md). New to this? Hand the repo URL to your AI client and ask it to
 walk you through installation using the README and INSTALL.md.
 
+## Try it now
+
+Once it's installed, you don't need a knowledge file or any Stryd custom fields to
+get started — just ask. A few things you can say right away:
+
+- *"Summarize my training this week."*
+- *"What's my PMC today, and how's my form trending?"*
+- *"Show me yesterday's run splits and cardiac decoupling."*
+
+A quick example:
+
+> **You:** What's my PMC today?
+>
+> **Claude:** Fitness (CTL) is 50, Fatigue (ATL) is 40, so Form (TSB) is +10 — you're
+> fresh. Fitness has been climbing steadily over the last three weeks while Fatigue
+> has stayed flat, so the current ramp looks sustainable rather than a spike.
+
+Want deeper, personalized coaching that reflects *your* own training philosophy? →
+[`training-knowledge-template/`](training-knowledge-template/) lets you teach your AI
+client how you like to train.
+
 ## Command-line use
 
 The same tools are also available from a shell via the `intervals-mcp` CLI (no MCP
@@ -106,6 +140,7 @@ raw data only; it does **not** apply the methodology. See [docs/CLI.md](docs/CLI
 - [SECURITY.md](SECURITY.md) — **security & privacy model**: what it connects to,
   what it reads/writes, where your key and cache live, HTTP mode
 - [ROADMAP.md](ROADMAP.md) — what's planned next
+- [BACKGROUND.md](BACKGROUND.md) — why this exists and the design principles behind it
 - [`training-knowledge-template/`](training-knowledge-template/) — build your own
   analysis knowledge for your AI client
 

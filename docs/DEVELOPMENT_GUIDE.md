@@ -292,7 +292,8 @@ intervals-mcp-server/
 2. リポジトリ root に **`.pii-forbidden`**（gitignored・非公開）を作り、**自分の実名・
    実メアド・home パス・内部ホスト名・地名**などを 1 行 1 文字列で列挙する。テストと
    `check-mcpb-pii.mjs` がこのファイルを読み、配布物に出ていないか検査する（ファイルが
-   無ければ deep チェックは skip、構造チェックは走る）。
+   無ければ deep チェックは skip、構造チェックは走る）。内部 role/agent 語彙（開発フロー
+   固有の呼称など）も同様に追加しておくと、description 等の公開文字列への混入を防げる。
 3. log-sentinel / console-error-allowlist は identity 非依存なのでそのまま効く。
 
 公開ドキュメント内の例示 email は RFC 2606 予約ドメイン（`example.com` / `.test` 等）、

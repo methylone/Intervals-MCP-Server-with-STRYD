@@ -2,7 +2,7 @@
   "manifest_version": "0.3",
   "name": "intervals-mcp-with-stryd",
   "display_name": "intervals-stryd",
-  "version": "0.12.0",
+  "version": "0.12.1",
   "description": "An Intervals.icu MCP server built for Stryd runners — power-based running analysis (a dual PMC with RSS and LBSS), designed so the LLM never does the math.",
   "author": {
     "name": "methylone"
